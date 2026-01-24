@@ -10,7 +10,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 import xgboost as xgb
 from datetime import datetime
 
-HF_TOKEN = "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"
+HF_TOKEN = "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"
 REPO_ID = "Syed110-3/karachi-aqi-predictor"
 login(token=HF_TOKEN)
 
