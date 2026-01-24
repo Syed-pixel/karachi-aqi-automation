@@ -7,7 +7,7 @@ from huggingface_hub import login, HfApi, hf_hub_download
 from datasets import load_dataset
 
 # Configuration
-HF_TOKEN = "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"
+HF_TOKEN = "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"
 REPO_ID = "Syed110-3/karachi-aqi-predictor"
 login(token=HF_TOKEN)
 
