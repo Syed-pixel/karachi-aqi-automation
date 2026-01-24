@@ -9,8 +9,13 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, r2_score
 import xgboost as xgb
 from datetime import datetime
+import os
 
-HF_TOKEN = "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"
+# Get HF_TOKEN from environment variable
+HF_TOKEN = os.getenv("HF_TOKEN")
+if not HF_TOKEN:
+    raise ValueError("HF_TOKEN environment variable not set")
+    
 REPO_ID = "Syed110-3/karachi-aqi-predictor"
 login(token=HF_TOKEN)
 
@@ -18,21 +23,16 @@ def prepare_data():
     dataset = load_dataset(REPO_ID)
     df = dataset['train'].to_pandas()
     
-    # Fill targets using future data
     for i in range(len(df)):
-        # Target 1 (24h later)
         if i + 24 < len(df):
             df.loc[i, 'target_day1'] = df.loc[i + 24, 'aqi']
         
-        # Target 2 (48h later)
         if i + 48 < len(df):
             df.loc[i, 'target_day2'] = df.loc[i + 48, 'aqi']
         
-        # Target 3 (72h later)
         if i + 72 < len(df):
             df.loc[i, 'target_day3'] = df.loc[i + 72, 'aqi']
     
-    # Remove rows where we don't have all 3 targets
     df = df.dropna(subset=['target_day1', 'target_day2', 'target_day3'])
     
     print(f"Training on {len(df)} rows with complete targets")
@@ -41,7 +41,6 @@ def prepare_data():
 def train_models():
     df = prepare_data()
     
-    # Features for training
     X = df[['hour', 'day_of_week', 'month', 'aqi', 'aqi_yesterday', 'aqi_change_24h', 'pm2_5']]
     
     api = HfApi()
@@ -73,7 +72,6 @@ def train_models():
                 best_model = model
                 best_name = name
         
-        # Save model
         model_filename = f'best_model_day{day_num}.pkl'
         joblib.dump(best_model, model_filename)
         
@@ -84,7 +82,6 @@ def train_models():
             repo_type="model"
         )
         
-        # Save model info
         model_info = {
             'model_name': best_name,
             'mae': float(best_mae),
