@@ -2,12 +2,20 @@ import requests
 import pandas as pd
 import joblib
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from huggingface_hub import login, HfApi, hf_hub_download
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
+import os
+from dotenv import load_dotenv
 
-# Configuration
-HF_TOKEN = "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"
+# Load environment variables
+load_dotenv()
+
+# Get HF_TOKEN from environment variable
+HF_TOKEN = os.getenv("HF_TOKEN")
+if not HF_TOKEN:
+    raise ValueError("HF_TOKEN environment variable not set. Create a .env file with HF_TOKEN=your_token")
+
 REPO_ID = "Syed110-3/karachi-aqi-predictor"
 login(token=HF_TOKEN)
 
