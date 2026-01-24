@@ -5,3 +5,4 @@ pandas
 joblib
 requests
 xgboost
+python-dotenv
