@@ -1,0 +1,6 @@
+.env
+*.pkl
+*.pyc
+__pycache__/
+*.json
+.DS_Store
