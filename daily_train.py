@@ -10,11 +10,15 @@ from sklearn.metrics import mean_absolute_error, r2_score
 import xgboost as xgb
 from datetime import datetime
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Get HF_TOKEN from environment variable
 HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN:
-    raise ValueError("HF_TOKEN environment variable not set")
+    raise ValueError("HF_TOKEN environment variable not set. Create a .env file with HF_TOKEN=your_token")
     
 REPO_ID = "Syed110-3/karachi-aqi-predictor"
 login(token=HF_TOKEN)
