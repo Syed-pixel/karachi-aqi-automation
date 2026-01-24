@@ -120,8 +120,9 @@ def predict():
         'target_day3': None
     }
     
-    # Add new row
-    df = df.append(new_row, ignore_index=True)
+    # FIXED: Use pd.concat instead of append
+    new_df = pd.DataFrame([new_row])
+    df = pd.concat([df, new_df], ignore_index=True)
     
     # Convert to dataset and push
     dataset = Dataset.from_pandas(df)
