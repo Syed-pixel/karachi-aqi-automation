@@ -10,6 +10,12 @@ jobs:
   hourly:
     runs-on: ubuntu-latest
     
+    # ADD THESE PERMISSIONS:
+    permissions:
+      contents: write
+      actions: write
+      checks: write
+    
     steps:
     - uses: actions/checkout@v3
     
@@ -28,6 +34,12 @@ jobs:
 
   daily:
     runs-on: ubuntu-latest
+    
+    # ADD THESE PERMISSIONS:
+    permissions:
+      contents: write
+      actions: write
+      checks: write
     
     steps:
     - uses: actions/checkout@v3
