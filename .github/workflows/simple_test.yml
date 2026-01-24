@@ -1,0 +1,12 @@
+name: Simple Echo Test
+
+on:
+  schedule:
+    - cron: '* * * * *'  # Every minute (for testing)
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - run: echo "Test at $(date)"
