@@ -14,7 +14,7 @@ load_dotenv()
 # Get HF_TOKEN from environment variable
 HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN:
-    raise ValueError("HF_TOKEN environment variable not set. Create a .env file with HF_TOKEN=your_token")
+    raise ValueError("HF_TOKEN not found. Create .env file with HF_TOKEN=your_token")
 
 REPO_ID = "Syed110-3/karachi-aqi-predictor"
 login(token=HF_TOKEN)
@@ -100,9 +100,13 @@ def predict():
     dataset = load_dataset(REPO_ID)
     df = dataset['train'].to_pandas()
     
+    # Convert timestamp to integer for consistent storage
+    dt = pd.to_datetime(features['timestamp'])
+    timestamp_int = int(dt.timestamp())
+    
     new_row = {
         'id': len(df),
-        'timestamp': features['timestamp'],
+        'timestamp': timestamp_int,  # Store as integer timestamp
         'aqi': features['aqi'],
         'pm2_5': features['pm2_5'],
         'hour': features['hour'],
@@ -116,7 +120,10 @@ def predict():
         'target_day3': None
     }
     
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    # Add new row
+    df = df.append(new_row, ignore_index=True)
+    
+    # Convert to dataset and push
     dataset = Dataset.from_pandas(df)
     dataset.push_to_hub(REPO_ID)
     
