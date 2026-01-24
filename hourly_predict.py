@@ -7,6 +7,7 @@ from huggingface_hub import login, HfApi, hf_hub_download
 from datasets import load_dataset, Dataset
 import os
 from dotenv import load_dotenv
+import numpy as np
 
 # Load environment variables
 load_dotenv()
@@ -50,14 +51,14 @@ def create_features():
     
     features = {
         'timestamp': dt.isoformat(),
-        'aqi': current_aqi,
-        'pm2_5': pm25,
-        'hour': dt.hour,
-        'day_of_week': dt.weekday(),
-        'month': dt.month,
-        'year': dt.year,
-        'aqi_yesterday': yesterday_aqi,
-        'aqi_change_24h': current_aqi - yesterday_aqi
+        'aqi': int(current_aqi),  # Convert to int
+        'pm2_5': float(pm25),     # Convert to float
+        'hour': int(dt.hour),
+        'day_of_week': int(dt.weekday()),
+        'month': int(dt.month),
+        'year': int(dt.year),
+        'aqi_yesterday': int(yesterday_aqi),
+        'aqi_change_24h': int(current_aqi - yesterday_aqi)
     }
     
     return features
@@ -94,7 +95,7 @@ def predict():
             pred = model.predict(input_df)[0]
             predictions[f'day{day}'] = float(pred)
         else:
-            predictions[f'day{day}'] = features['aqi']
+            predictions[f'day{day}'] = float(features['aqi'])
     
     # Save new data
     dataset = load_dataset(REPO_ID)
@@ -105,16 +106,16 @@ def predict():
     timestamp_int = int(dt.timestamp())
     
     new_row = {
-        'id': len(df),
-        'timestamp': timestamp_int,  # Store as integer timestamp
-        'aqi': features['aqi'],
-        'pm2_5': features['pm2_5'],
-        'hour': features['hour'],
-        'day_of_week': features['day_of_week'],
-        'month': features['month'],
-        'year': features['year'],
-        'aqi_yesterday': features['aqi_yesterday'],
-        'aqi_change_24h': features['aqi_change_24h'],
+        'id': int(len(df)),
+        'timestamp': int(timestamp_int),  # Store as int
+        'aqi': int(features['aqi']),
+        'pm2_5': float(features['pm2_5']),
+        'hour': int(features['hour']),
+        'day_of_week': int(features['day_of_week']),
+        'month': int(features['month']),
+        'year': int(features['year']),
+        'aqi_yesterday': int(features['aqi_yesterday']),
+        'aqi_change_24h': int(features['aqi_change_24h']),
         'target_day1': None,
         'target_day2': None,
         'target_day3': None
@@ -128,10 +129,10 @@ def predict():
     dataset = Dataset.from_pandas(df)
     dataset.push_to_hub(REPO_ID)
     
-    # Save predictions
+    # Save predictions - convert all numpy types to Python native types
     pred_data = {
-        'timestamp': features['timestamp'],
-        'predictions': predictions,
+        'timestamp': str(features['timestamp']),  # Keep as string
+        'predictions': {k: float(v) for k, v in predictions.items()},
         'features': features
     }
     
@@ -145,7 +146,7 @@ def predict():
     
     print(f"Hourly update: {features['timestamp']}")
     print(f"Current AQI: {features['aqi']}")
-    print(f"PM2.5: {features['pm2_5']}")
+    print(f"PM2.5: {features['pm2_5']:.1f}")
     print(f"Predictions: Day1={predictions['day1']:.1f}, Day2={predictions['day2']:.1f}, Day3={predictions['day3']:.1f}")
     
     return predictions
