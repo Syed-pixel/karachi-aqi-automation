@@ -1,5 +1,6 @@
 name: AQI Automation
 
+# Accept external triggers
 on:
   repository_dispatch:
     types: [run_hourly, run_daily]
@@ -7,7 +8,7 @@ on:
 
 jobs:
   hourly:
-    if: github.event.client_payload.type == 'hourly'
+    if: github.event.client_payload.type == 'hourly' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
     steps:
@@ -27,7 +28,7 @@ jobs:
       run: python hourly_predict.py
 
   daily:
-    if: github.event.client_payload.type == 'daily'
+    if: github.event.client_payload.type == 'daily' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
     steps:
