@@ -80,65 +80,147 @@ with st.sidebar:
     """)
     
     st.markdown("---")
-    st.markdown("### 📡 Data Pipeline")
+    st.markdown("### 📡 Data Sources")
     st.markdown("""
-    1. Hourly: GitHub Actions fetches latest AQI
-    2. Hourly: ML models generate 3-day forecast
-    3. Hourly: Data uploaded to Hugging Face
-    4. Dashboard auto-loads latest data
+    **1. Current AQI:**
+    - Source: Hugging Face Dataset
+    - URL: `Syed110-3/karachi-aqi-predictor`
+    - Fetch: Last row of dataset
+    
+    **2. Predictions:**
+    - Source: Hugging Face Models
+    - URL: `karachi-aqi-predictor/predictions/`
+    - Fetch: Latest JSON file
     """)
 
 # Cache function - updated every hour
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def get_latest_data():
-    """Get latest AQI data and predictions from Hugging Face"""
+def get_latest_aqi_from_dataset():
+    """Get latest AQI data from Hugging Face dataset (last row)"""
     try:
-        # Get latest AQI data from dataset (last row)
-        dataset_url = "https://huggingface.co/datasets/Syed110-3/karachi-aqi-predictor/resolve/main/data/latest_aqi.csv"
-        dataset_response = requests.get(dataset_url, timeout=10)
+        # Fetch the dataset parquet file
+        dataset_url = "https://huggingface.co/datasets/Syed110-3/karachi-aqi-predictor/resolve/refs%2Fconvert%2Fparquet/default/train/0000.parquet"
         
-        current_aqi_data = {}
-        if dataset_response.status_code == 200:
-            # Read CSV content
-            content = dataset_response.content.decode('utf-8')
-            lines = content.strip().split('\n')
-            if len(lines) > 1:
-                # Get last row (latest data)
-                last_line = lines[-1]
-                values = last_line.split(',')
-                if len(values) >= 4:  # Assuming format: timestamp, aqi, pm25, location
-                    try:
-                        current_aqi_data = {
-                            "aqi": float(values[1]),
-                            "pm25": float(values[2]),
-                            "timestamp": values[0],
-                            "location": "Karachi" if len(values) < 4 else values[3],
-                            "source": "Hugging Face Dataset"
-                        }
-                    except:
-                        pass
+        response = requests.get(dataset_url, timeout=15)
         
-        # If dataset fetch fails, fallback to Open-Meteo
-        if not current_aqi_data:
-            url = "https://air-quality-api.open-meteo.com/v1/air-quality"
-            params = {"latitude": 24.8607, "longitude": 67.0011, "current": "pm2_5"}
-            response = requests.get(url, params=params, timeout=5)
-            data = response.json()
+        if response.status_code == 200:
+            # Read the parquet file
+            import io
+            import pyarrow.parquet as pq
             
-            pm25 = data['current']['pm2_5']
-            aqi = round((pm25 / 35.4) * 100)
-            aqi = max(0, min(500, aqi))
+            # Read parquet file from bytes
+            parquet_file = io.BytesIO(response.content)
+            df = pq.read_table(parquet_file).to_pandas()
             
-            current_aqi_data = {
-                "aqi": aqi,
-                "pm25": pm25,
-                "timestamp": data['current']['time'],
-                "location": "Karachi (24.86°N, 67.00°E)",
-                "source": "Open-Meteo API"
-            }
+            if len(df) > 0:
+                # Get the last row (most recent data)
+                last_row = df.iloc[-1]
+                
+                # Convert timestamp from integer to datetime
+                timestamp_int = int(last_row.get('timestamp', 0))
+                if timestamp_int > 0:
+                    timestamp_dt = datetime.fromtimestamp(timestamp_int)
+                else:
+                    timestamp_dt = datetime.now()
+                
+                # Get AQI value - ensure it's integer
+                aqi = int(last_row.get('aqi', 0))
+                pm25 = float(last_row.get('pm2_5', 0))
+                
+                return {
+                    "aqi": aqi,
+                    "pm25": pm25,
+                    "timestamp": timestamp_dt.isoformat(),
+                    "timestamp_display": timestamp_dt.strftime('%Y-%m-%d %H:%M UTC'),
+                    "hour": int(last_row.get('hour', 0)),
+                    "day_of_week": int(last_row.get('day_of_week', 0)),
+                    "month": int(last_row.get('month', 0)),
+                    "aqi_yesterday": int(last_row.get('aqi_yesterday', 0)),
+                    "aqi_change_24h": int(last_row.get('aqi_change_24h', 0)),
+                    "source": "Hugging Face Dataset",
+                    "total_records": len(df)
+                }
         
-        # Get latest predictions
-        predictions_url = "https://huggingface.co/api/datasets/Syed110-3/karachi-aqi-predictor/tree/main/predictions"
+        # Fallback: Try to fetch via datasets library API
+        try:
+            api_url = "https://datasets-server.huggingface.co/rows?dataset=Syed110-3%2Fkarachi-aqi-predictor&config=default&split=train&offset=0&length=100"
+            api_response = requests.get(api_url, timeout=10)
+            
+            if api_response.status_code == 200:
+                data = api_response.json()
+                rows = data.get('rows', [])
+                
+                if rows:
+                    # Get last row
+                    last_row_data = rows[-1]['row']
+                    
+                    # Extract data
+                    timestamp_int = int(last_row_data.get('timestamp', 0))
+                    if timestamp_int > 0:
+                        timestamp_dt = datetime.fromtimestamp(timestamp_int)
+                    else:
+                        timestamp_dt = datetime.now()
+                    
+                    aqi = int(last_row_data.get('aqi', 0))
+                    pm25 = float(last_row_data.get('pm2_5', 0))
+                    
+                    return {
+                        "aqi": aqi,
+                        "pm25": pm25,
+                        "timestamp": timestamp_dt.isoformat(),
+                        "timestamp_display": timestamp_dt.strftime('%Y-%m-%d %H:%M UTC'),
+                        "hour": int(last_row_data.get('hour', 0)),
+                        "day_of_week": int(last_row_data.get('day_of_week', 0)),
+                        "month": int(last_row_data.get('month', 0)),
+                        "aqi_yesterday": int(last_row_data.get('aqi_yesterday', 0)),
+                        "aqi_change_24h": int(last_row_data.get('aqi_change_24h', 0)),
+                        "source": "Datasets API",
+                        "total_records": len(rows)
+                    }
+        except:
+            pass
+        
+    except Exception as e:
+        st.error(f"Dataset fetch error: {str(e)[:100]}")
+    
+    # Ultimate fallback: Use Open-Meteo API
+    try:
+        url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+        params = {"latitude": 24.8607, "longitude": 67.0011, "current": "pm2_5"}
+        response = requests.get(url, params=params, timeout=5)
+        data = response.json()
+        
+        pm25 = data['current']['pm2_5']
+        aqi = round((pm25 / 35.4) * 100)
+        aqi = max(0, min(500, aqi))
+        
+        return {
+            "aqi": aqi,
+            "pm25": pm25,
+            "timestamp": data['current']['time'],
+            "timestamp_display": datetime.now().strftime('%Y-%m-%d %H:%M UTC'),
+            "hour": datetime.now().hour,
+            "source": "Open-Meteo API (fallback)",
+            "total_records": 0
+        }
+    except:
+        # Last resort fallback
+        return {
+            "aqi": 85,
+            "pm25": 30.0,
+            "timestamp": datetime.now().isoformat(),
+            "timestamp_display": datetime.now().strftime('%Y-%m-%d %H:%M UTC'),
+            "hour": datetime.now().hour,
+            "source": "Static fallback",
+            "total_records": 0
+        }
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def get_latest_predictions():
+    """Get latest predictions from Hugging Face predictions folder"""
+    try:
+        # First, try to get list of prediction files
+        predictions_url = "https://huggingface.co/api/models/Syed110-3/karachi-aqi-predictor/tree/main/predictions"
         pred_response = requests.get(predictions_url, timeout=10)
         
         predictions_data = {}
@@ -149,7 +231,7 @@ def get_latest_data():
             pred_files = []
             for item in files:
                 if isinstance(item, dict) and 'path' in item:
-                    if item['path'].startswith('predictions/pred_') and item['path'].endswith('.json'):
+                    if 'pred_' in item['path'] and item['path'].endswith('.json'):
                         pred_files.append(item)
             
             if pred_files:
@@ -158,49 +240,49 @@ def get_latest_data():
                 latest_pred_file = pred_files[0]['path']
                 
                 # Download the latest prediction file
-                pred_file_url = f"https://huggingface.co/datasets/Syed110-3/karachi-aqi-predictor/resolve/main/{latest_pred_file}"
+                pred_file_url = f"https://huggingface.co/Syed110-3/karachi-aqi-predictor/resolve/main/{latest_pred_file}"
                 pred_data_response = requests.get(pred_file_url, timeout=10)
                 
                 if pred_data_response.status_code == 200:
                     predictions_data = pred_data_response.json()
+                    
+                    # Ensure predictions are properly formatted
+                    if 'predictions' in predictions_data:
+                        # Convert all values to float
+                        for key in predictions_data['predictions']:
+                            predictions_data['predictions'][key] = float(predictions_data['predictions'][key])
+                    
+                    return predictions_data
         
-        # If no predictions found, use demo data
-        if not predictions_data:
-            predictions_data = {
-                "timestamp": datetime.now().isoformat(),
-                "predictions": {
-                    "day1": current_aqi_data.get("aqi", 85.5) + 5,
-                    "day2": current_aqi_data.get("aqi", 85.5) + 7,
-                    "day3": current_aqi_data.get("aqi", 85.5) + 10
-                },
-                "note": "Demo predictions - hourly update pending"
-            }
+        # If no predictions found, try to fetch from models API as fallback
+        models_url = "https://huggingface.co/api/models/Syed110-3/karachi-aqi-predictor"
+        models_response = requests.get(models_url, timeout=10)
         
-        return {
-            "current": current_aqi_data,
-            "predictions": predictions_data
-        }
+        if models_response.status_code == 200:
+            models_info = models_response.json()
+            if 'siblings' in models_info:
+                for sibling in models_info['siblings']:
+                    if sibling.get('rfilename', '').startswith('predictions/pred_') and sibling['rfilename'].endswith('.json'):
+                        # Found a prediction file
+                        pred_file_url = f"https://huggingface.co/Syed110-3/karachi-aqi-predictor/resolve/main/{sibling['rfilename']}"
+                        pred_data_response = requests.get(pred_file_url, timeout=10)
+                        if pred_data_response.status_code == 200:
+                            return pred_data_response.json()
         
     except Exception as e:
-        # Fallback data if everything fails
-        return {
-            "current": {
-                "aqi": 85.5,
-                "pm25": 30.2,
-                "timestamp": datetime.now().isoformat(),
-                "location": "Karachi",
-                "source": "Fallback Data"
-            },
-            "predictions": {
-                "timestamp": datetime.now().isoformat(),
-                "predictions": {
-                    "day1": 85.5,
-                    "day2": 87.2,
-                    "day3": 89.8
-                },
-                "note": "System updating..."
-            }
-        }
+        st.error(f"Predictions fetch error: {str(e)[:100]}")
+    
+    # Return demo predictions if everything fails
+    current_aqi = get_latest_aqi_from_dataset()['aqi']
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "predictions": {
+            "day1": float(current_aqi) + 5.0,
+            "day2": float(current_aqi) + 7.0,
+            "day3": float(current_aqi) + 10.0
+        },
+        "note": "Demo predictions - awaiting hourly update"
+    }
 
 # Function to get AQI level information
 def get_aqi_info(aqi):
@@ -252,9 +334,8 @@ def get_aqi_info(aqi):
         }
 
 # Get latest data (auto-cached for 1 hour)
-data = get_latest_data()
-current_data = data["current"]
-predictions = data["predictions"]
+current_data = get_latest_aqi_from_dataset()
+predictions = get_latest_predictions()
 
 # Get current AQI info
 current_aqi = current_data['aqi']
@@ -289,9 +370,11 @@ with col1:
     # Level and details
     st.markdown(f"**Level:** {aqi_info['level']}")
     st.markdown(f"**PM2.5 Concentration:** {current_data['pm25']:.1f} µg/m³")
-    st.markdown(f"**Location:** {current_data['location']}")
-    st.markdown(f"**Last Updated:** {current_data['timestamp'][11:16]} UTC")
-    st.markdown(f"**Source:** {current_data.get('source', 'Live API')}")
+    st.markdown(f"**Location:** Karachi")
+    st.markdown(f"**Recorded:** {current_data['timestamp_display']}")
+    st.markdown(f"**Data Source:** {current_data['source']}")
+    if current_data['total_records'] > 0:
+        st.markdown(f"**Dataset Records:** {current_data['total_records']:,}")
     
     # AQI scale indicator
     st.markdown("---")
@@ -351,13 +434,13 @@ with col3:
     # Current AQI freshness
     try:
         data_time = datetime.fromisoformat(current_data['timestamp'].replace('Z', '+00:00'))
-        data_age_hours = (now - data_time).total_seconds() / 3600
-        if data_age_hours < 1:
-            st.success(f"Current AQI: {data_age_hours*60:.0f} minutes ago")
-        elif data_age_hours < 2:
-            st.info(f"Current AQI: {data_age_hours:.1f} hours ago")
+        data_age_minutes = (now - data_time).total_seconds() / 60
+        if data_age_minutes < 60:
+            st.success(f"Current AQI: {data_age_minutes:.0f} min ago")
+        elif data_age_minutes < 120:
+            st.info(f"Current AQI: {data_age_minutes/60:.1f} hours ago")
         else:
-            st.warning(f"Current AQI: {data_age_hours:.1f} hours ago")
+            st.warning(f"Current AQI: {data_age_minutes/60:.1f} hours ago")
     except:
         st.warning("Current AQI: Time unknown")
     
@@ -365,13 +448,13 @@ with col3:
     if 'timestamp' in predictions:
         try:
             pred_time = datetime.fromisoformat(predictions['timestamp'].replace('Z', '+00:00'))
-            pred_age_hours = (now - pred_time).total_seconds() / 3600
-            if pred_age_hours < 1:
-                st.success(f"Predictions: {pred_age_hours*60:.0f} minutes ago")
-            elif pred_age_hours < 2:
-                st.info(f"Predictions: {pred_age_hours:.1f} hours ago")
+            pred_age_minutes = (now - pred_time).total_seconds() / 60
+            if pred_age_minutes < 60:
+                st.success(f"Predictions: {pred_age_minutes:.0f} min ago")
+            elif pred_age_minutes < 120:
+                st.info(f"Predictions: {pred_age_minutes/60:.1f} hours ago")
             else:
-                st.warning(f"Predictions: {pred_age_hours:.1f} hours ago")
+                st.warning(f"Predictions: {pred_age_minutes/60:.1f} hours ago")
         except:
             st.warning("Predictions: Time unknown")
     
@@ -390,9 +473,9 @@ if predictions and 'predictions' in predictions:
     for i in range(1, 4):
         day_key = f'day{i}'
         if day_key in predictions['predictions']:
-            values.append(predictions['predictions'][day_key])
+            values.append(float(predictions['predictions'][day_key]))
         else:
-            values.append(current_aqi + i * 5)  # Fallback increment
+            values.append(float(current_aqi) + i * 5)  # Fallback increment
     
     # Create colors and info for each day
     colors = []
@@ -475,8 +558,11 @@ if predictions and 'predictions' in predictions:
         )
         
         if predictions and 'timestamp' in predictions:
-            pred_time = datetime.fromisoformat(predictions['timestamp'].replace('Z', '+00:00'))
-            st.caption(f"Predictions generated: {pred_time.strftime('%Y-%m-%d %H:%M UTC')}")
+            try:
+                pred_time = datetime.fromisoformat(predictions['timestamp'].replace('Z', '+00:00'))
+                st.caption(f"Predictions generated: {pred_time.strftime('%Y-%m-%d %H:%M UTC')}")
+            except:
+                st.caption(f"Predictions timestamp: {predictions['timestamp']}")
         else:
             st.caption("Predictions: Hourly updates via GitHub Actions")
         
@@ -486,55 +572,53 @@ else:
     The system updates predictions hourly. Next update at the top of the hour.
     """)
 
-# Row 3: Data Pipeline Information
+# Row 3: Technical Details
 st.markdown("---")
-st.markdown("## 🔗 Automated Data Pipeline")
+st.markdown("## 🔗 Technical Architecture")
 
 col_info1, col_info2, col_info3 = st.columns(3)
 
 with col_info1:
-    st.markdown("### 📡 Data Sources")
+    st.markdown("### 📡 Data Flow")
     st.markdown("""
-    **Hourly AQI Data:**
-    - Stored in: Hugging Face Dataset
-    - Updated: Hourly (on the hour)
-    - Source: Latest dataset row
-    
-    **3-Day Forecasts:**
-    - Generated by: ML models in Hugging Face
-    - Models: RandomForest, XGBoost, Ridge
-    - Updated: Hourly predictions
+    **Hourly Automation:**
+    1. GitHub Actions triggers at :00
+    2. Fetches current AQI from Open-Meteo
+    3. Loads models from Hugging Face
+    4. Generates 3-day predictions
+    5. Updates dataset with new row
+    6. Saves predictions as JSON
     """)
 
 with col_info2:
-    st.markdown("### ⚙️ Automation System")
+    st.markdown("### 🤖 ML Models")
     st.markdown("""
-    **GitHub Actions Pipeline:**
-    1. **Hourly:** Fetches latest AQI
-    2. **Hourly:** Runs 3 ML models
-    3. **Hourly:** Saves predictions
-    4. **Hourly:** Updates dataset
+    **Stored in Hugging Face:**
+    - `best_model_day1.pkl`
+    - `best_model_day2.pkl`  
+    - `best_model_day3.pkl`
     
-    **ML Models (in Hugging Face):**
-    - best_model_day1.pkl
-    - best_model_day2.pkl  
-    - best_model_day3.pkl
-    - Daily retraining: 2 AM UTC
+    **Model Info:**
+    - Format: Scikit-learn Pickle
+    - Features: AQI, hour, day, month, PM2.5
+    - Target: Next day AQI
+    - Retraining: Daily at 2 AM UTC
     """)
 
 with col_info3:
-    st.markdown("### 📊 Dashboard Features")
+    st.markdown("### 📊 Dashboard System")
     st.markdown("""
-    **Auto-Update System:**
-    - Updates: Every hour automatically
+    **Auto-Fetch System:**
+    - Dataset: Fetches last row for current AQI
+    - Predictions: Gets latest JSON file
     - Cache: 1-hour TTL
-    - No manual refresh needed
+    - Auto-refresh: At top of each hour
     
-    **Real-time Monitoring:**
-    - Current AQI: From dataset
-    - Health alerts: Automatic
-    - Forecasts: AI-powered
-    - All data: Auto-synced hourly
+    **Built With:**
+    - Streamlit (Frontend)
+    - Hugging Face APIs (Data)
+    - Plotly (Visualization)
+    - Pandas (Data processing)
     """)
 
 # Footer with update countdown
@@ -549,21 +633,43 @@ with col_footer1:
     """)
     
     st.caption("""
-    This dashboard auto-updates hourly with the latest AQI data and AI-powered forecasts.
-    All data is fetched from the Hugging Face dataset updated by GitHub Actions automation.
+    This dashboard fetches data from Hugging Face: Current AQI from dataset, predictions from models repository.
+    All updates happen automatically via hourly GitHub Actions automation.
     """)
 
 with col_footer2:
-    # Simple refresh button (optional)
-    if st.button("Check for Updates", use_container_width=True):
+    # Simple manual refresh (optional)
+    if st.button("🔄 Check Now", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-# Auto-refresh every hour (check at minute 0)
+# Auto-refresh at the top of each hour
 if now.minute == 0:
-    # Clear cache and refresh at the top of the hour
+    # Clear cache and refresh
     st.cache_data.clear()
     st.rerun()
 
-# Note: The dashboard will automatically refresh when the cache expires (1 hour)
-# and also at the top of every hour to ensure timely updates
+# Debug section (collapsed)
+with st.expander("🔧 Debug Information"):
+    tab1, tab2 = st.tabs(["Current Data", "Predictions"])
+    
+    with tab1:
+        st.write("### Current AQI Data")
+        st.json(current_data)
+        
+        # Test dataset connection
+        if st.button("Test Dataset Connection"):
+            test_data = get_latest_aqi_from_dataset()
+            st.write("Test Result:", test_data)
+    
+    with tab2:
+        st.write("### Prediction Data")
+        st.json(predictions)
+        
+        if predictions and 'predictions' in predictions:
+            st.write("### Raw Prediction Values")
+            for day, value in predictions['predictions'].items():
+                st.metric(f"{day.upper()} AQI", f"{value:.1f}")
+
+# The app will automatically refresh when cache expires (1 hour)
+# and also check at the top of every hour for immediate updates
