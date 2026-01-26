@@ -6,7 +6,6 @@ import json
 from datetime import datetime, timedelta
 import time
 import numpy as np
-from streamlit_autorefresh import st_autorefresh
 
 # Page config
 st.set_page_config(
@@ -449,20 +448,17 @@ if show_loading:
     **Available in:** {seconds_remaining} seconds
     """)
     
-    # Countdown timer
-    countdown_placeholder = st.empty()
-    for i in range(seconds_remaining, 0, -1):
-        countdown_placeholder.markdown(f"**Refreshing in:** {i} seconds")
-        time.sleep(1)
+    # Show static countdown (can't do dynamic countdown in Streamlit without refresh)
+    st.markdown(f"**⏳ Refreshing automatically in {seconds_remaining} seconds...**")
     
     st.markdown("**🎉 Predictions should now be available!**")
-    st.markdown("The page will refresh automatically...")
+    st.markdown("The page will refresh automatically when ready...")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Auto-refresh after countdown
-    time.sleep(2)
-    st.cache_data.clear()
-    st.rerun()
+    # Add a manual refresh button
+    if st.button("🔄 Check for Predictions Now", type="primary"):
+        st.cache_data.clear()
+        st.rerun()
     
 elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions' in predictions:
     # SHOW ACTUAL PREDICTIONS
@@ -651,8 +647,8 @@ with col_info3:
     **User Experience:**
     - Shows "Generating..." state
     - Countdown timer
-    - Auto-refresh when ready
     - Clear status messages
+    - Manual refresh option
     """)
 
 # Footer
@@ -685,18 +681,15 @@ with col_footer2:
         st.cache_data.clear()
         st.rerun()
 
-# Auto-refresh logic
-# Refresh more aggressively during the 90-second window
-if show_loading and seconds_remaining < 60:
-    # If we're in the last minute of waiting, refresh every 10 seconds
-    time.sleep(10)
-    st.cache_data.clear()
-    st.rerun()
-elif now.minute == 1 and now.second >= 25 and now.second <= 35:
-    # Refresh around the 90-second mark
-    time.sleep(5)
-    st.cache_data.clear()
-    st.rerun()
+# Add auto-refresh logic using st.rerun() at appropriate times
+# Check if we're in the loading window and add a timed refresh
+if show_loading:
+    # Set a timer to auto-refresh after the waiting period
+    if seconds_remaining <= 10:
+        # If less than 10 seconds remaining, refresh now
+        time.sleep(2)
+        st.cache_data.clear()
+        st.rerun()
 
 # Debug section
 with st.expander("🔧 Debug & Raw Data"):
