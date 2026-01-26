@@ -9,307 +9,94 @@ import numpy as np
 
 # Page config
 st.set_page_config(
-    page_title="KARACHI AQI | CYBER MONITOR",
-    page_icon="⚡",
+    page_title="Karachi AQI Dashboard",
+    page_icon="🌫️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Cyberpunk Custom CSS
+# Custom CSS - ADD LOADING ANIMATION
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap');
-    
-    * {
-        font-family: 'Rajdhani', sans-serif;
-    }
-    
-    .main {
-        background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 50%, #16213e 100%);
-        color: #00ff9f;
-    }
-    
-    .stApp {
-        background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 50%, #16213e 100%);
-    }
-    
-    h1, h2, h3 {
-        font-family: 'Orbitron', sans-serif;
-        text-transform: uppercase;
-        letter-spacing: 3px;
-        text-shadow: 0 0 10px #00ff9f, 0 0 20px #00ff9f;
-    }
-    
-    .cyber-header {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 3.5rem;
-        font-weight: 900;
+    .main-header {
+        font-size: 2.5rem;
+        color: #1E3A8A;
         text-align: center;
-        background: linear-gradient(45deg, #00ff9f, #00d4ff, #ff00ff, #00ff9f);
-        background-size: 300% 300%;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        animation: gradient-shift 3s ease infinite;
-        text-shadow: 0 0 30px rgba(0, 255, 159, 0.5);
-        margin-bottom: 0.5rem;
-        letter-spacing: 5px;
-    }
-    
-    @keyframes gradient-shift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-    
-    .cyber-subtitle {
-        text-align: center;
-        color: #00d4ff;
-        font-size: 1.2rem;
-        letter-spacing: 4px;
-        margin-bottom: 2rem;
-        text-shadow: 0 0 10px #00d4ff;
-    }
-    
-    .cyber-card {
-        background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(22, 33, 62, 0.9));
-        border: 2px solid #00ff9f;
-        border-radius: 15px;
-        padding: 1.5rem;
         margin-bottom: 1rem;
-        box-shadow: 0 0 20px rgba(0, 255, 159, 0.3), inset 0 0 20px rgba(0, 255, 159, 0.1);
-        position: relative;
-        overflow: hidden;
     }
-    
-    .cyber-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #00ff9f, transparent);
-        animation: scan 3s infinite;
+    .metric-card {
+        background-color: #F8FAFC;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 5px solid #3B82F6;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    
-    @keyframes scan {
-        0% { left: -100%; }
-        100% { left: 100%; }
-    }
-    
-    .aqi-cyber-good { 
-        border-color: #00ff9f !important;
-        box-shadow: 0 0 30px rgba(0, 255, 159, 0.5), inset 0 0 30px rgba(0, 255, 159, 0.1) !important;
-    }
-    
-    .aqi-cyber-moderate { 
-        border-color: #ffff00 !important;
-        box-shadow: 0 0 30px rgba(255, 255, 0, 0.5), inset 0 0 30px rgba(255, 255, 0, 0.1) !important;
-    }
-    
-    .aqi-cyber-unhealthy { 
-        border-color: #ff6b00 !important;
-        box-shadow: 0 0 30px rgba(255, 107, 0, 0.5), inset 0 0 30px rgba(255, 107, 0, 0.1) !important;
-    }
-    
-    .aqi-cyber-very-unhealthy { 
-        border-color: #ff0055 !important;
-        box-shadow: 0 0 30px rgba(255, 0, 85, 0.5), inset 0 0 30px rgba(255, 0, 85, 0.1) !important;
-    }
-    
-    .aqi-cyber-hazardous { 
-        border-color: #ff00ff !important;
-        box-shadow: 0 0 30px rgba(255, 0, 255, 0.5), inset 0 0 30px rgba(255, 0, 255, 0.1) !important;
-    }
-    
-    .cyber-badge {
-        background: linear-gradient(45deg, #00ff9f, #00d4ff);
-        color: #0a0e27;
-        padding: 8px 20px;
-        border-radius: 25px;
-        font-weight: 700;
-        font-size: 0.9rem;
+    .aqi-good { color: #10B981; border-left-color: #10B981 !important; }
+    .aqi-moderate { color: #F59E0B; border-left-color: #F59E0B !important; }
+    .aqi-unhealthy { color: #EF4444; border-left-color: #EF4444 !important; }
+    .aqi-very-unhealthy { color: #8B5CF6; border-left-color: #8B5CF6 !important; }
+    .aqi-hazardous { color: #7C3AED; border-left-color: #7C3AED !important; }
+    .update-badge {
+        background: linear-gradient(45deg, #10B981, #059669);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.8rem;
         display: inline-block;
-        margin: 10px 0;
-        box-shadow: 0 0 20px rgba(0, 255, 159, 0.5);
-        letter-spacing: 2px;
-        text-transform: uppercase;
+        margin: 5px 0;
     }
-    
-    .glitch-text {
-        font-size: 6rem;
-        font-family: 'Orbitron', sans-serif;
-        font-weight: 900;
-        text-align: center;
-        animation: glitch 2s infinite;
+    .pipeline-step {
+        background: #F1F5F9;
+        padding: 10px;
+        border-radius: 8px;
+        margin: 5px 0;
+        border-left: 4px solid #3B82F6;
     }
-    
-    @keyframes glitch {
-        0%, 100% { text-shadow: 0 0 20px currentColor; }
-        25% { text-shadow: -2px 0 20px currentColor, 2px 2px 20px #00d4ff; }
-        50% { text-shadow: 2px 0 20px currentColor, -2px -2px 20px #ff00ff; }
-        75% { text-shadow: -2px 2px 20px currentColor, 2px 0 20px #00ff9f; }
-    }
-    
-    .loading-cyber {
+    .loading-spinner {
         display: inline-block;
-        width: 25px;
-        height: 25px;
-        border: 4px solid rgba(0, 255, 159, 0.3);
-        border-top: 4px solid #00ff9f;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3B82F6;
         border-radius: 50%;
-        animation: cyber-spin 1s linear infinite;
+        animation: spin 1s linear infinite;
         margin-right: 10px;
-        box-shadow: 0 0 10px #00ff9f;
     }
-    
-    @keyframes cyber-spin {
+    @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
-    
-    .prediction-cyber-loading {
-        background: linear-gradient(135deg, rgba(0, 255, 159, 0.1), rgba(0, 212, 255, 0.1));
-        padding: 30px;
-        border-radius: 15px;
+    .prediction-loading {
+        background: linear-gradient(45deg, #f0f9ff, #e0f2fe);
+        padding: 20px;
+        border-radius: 10px;
         text-align: center;
         margin: 20px 0;
-        border: 2px dashed #00ff9f;
-        box-shadow: 0 0 30px rgba(0, 255, 159, 0.3);
-    }
-    
-    .cyber-grid {
-        background-image: 
-            linear-gradient(rgba(0, 255, 159, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 255, 159, 0.1) 1px, transparent 1px);
-        background-size: 50px 50px;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: -1;
-        opacity: 0.3;
-    }
-    
-    .status-dot {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        margin-right: 8px;
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 5px currentColor; }
-        50% { box-shadow: 0 0 20px currentColor; }
-    }
-    
-    .status-online { background: #00ff9f; box-shadow: 0 0 10px #00ff9f; }
-    .status-warning { background: #ffff00; box-shadow: 0 0 10px #ffff00; }
-    .status-offline { background: #ff0055; box-shadow: 0 0 10px #ff0055; }
-    
-    .stButton > button {
-        background: linear-gradient(45deg, #00ff9f, #00d4ff) !important;
-        color: #0a0e27 !important;
-        border: none !important;
-        border-radius: 25px !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 2px !important;
-        box-shadow: 0 0 20px rgba(0, 255, 159, 0.5) !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .stButton > button:hover {
-        box-shadow: 0 0 30px rgba(0, 255, 159, 0.8) !important;
-        transform: translateY(-2px) !important;
-    }
-    
-    .sidebar .sidebar-content {
-        background: linear-gradient(180deg, rgba(26, 26, 46, 0.95), rgba(22, 33, 62, 0.95));
-        border-right: 2px solid #00ff9f;
-    }
-    
-    .metric-cyber {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 1.2rem;
-        color: #00d4ff;
-        text-shadow: 0 0 5px #00d4ff;
-        letter-spacing: 2px;
-    }
-    
-    hr {
-        border: none;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #00ff9f, transparent);
-        margin: 2rem 0;
-    }
-    
-    .stProgress > div > div > div {
-        background: linear-gradient(90deg, #00ff9f, #00d4ff) !important;
-        box-shadow: 0 0 10px #00ff9f !important;
-    }
-    
-    .hexagon {
-        width: 100px;
-        height: 57.735px;
-        background: #00ff9f;
-        position: relative;
-        margin: 28.8675px 0;
-    }
-    
-    .hexagon::before,
-    .hexagon::after {
-        content: "";
-        position: absolute;
-        width: 0;
-        border-left: 50px solid transparent;
-        border-right: 50px solid transparent;
-    }
-    
-    .hexagon::before {
-        bottom: 100%;
-        border-bottom: 28.8675px solid #00ff9f;
-    }
-    
-    .hexagon::after {
-        top: 100%;
-        width: 0;
-        border-top: 28.8675px solid #00ff9f;
+        border: 2px dashed #3B82F6;
     }
 </style>
-<div class="cyber-grid"></div>
 """, unsafe_allow_html=True)
 
 # Title
-st.markdown('<h1 class="cyber-header">⚡ KARACHI AQI MONITOR</h1>', unsafe_allow_html=True)
-st.markdown('<div class="cyber-subtitle">// NEURAL NETWORK POWERED AIR QUALITY SYSTEM //</div>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">🌫️ Karachi Air Quality Dashboard</h1>', unsafe_allow_html=True)
+st.markdown("### Live monitoring with AI-powered 3-day forecasts")
 
 # Sidebar
 with st.sidebar:
-    st.markdown("### ⚡ SYSTEM CONTROL")
-    st.markdown("---")
-    
-    st.markdown("### <span class='status-dot status-online'></span> LIVE DATA FEED", unsafe_allow_html=True)
-    st.markdown("""
-    ```
-    > CURRENT AQI: Real-time
-    > UPDATE FREQ: 5 minutes
-    > SOURCE: Open-Meteo API
-    ```
-    """)
+    st.image("https://cdn-icons-png.flaticon.com/512/869/869869.png", width=100)
+    st.title("⚙️ System Status")
     
     st.markdown("---")
-    st.markdown("### <span class='status-dot status-warning'></span> AI PREDICTIONS", unsafe_allow_html=True)
+    st.markdown("### ⏰ Update Schedule")
     st.markdown("""
-    ```
-    > GENERATION: :00:00 UTC
-    > PROCESSING: ~90 seconds
-    > AVAILABILITY: :01:30 UTC
-    > FORECAST: 3-day horizon
-    ```
+    **Live Data:**
+    - Current AQI: Real-time (every load)
+    
+    **AI Predictions:**
+    - Generated: On the hour
+    - Available: ~90 seconds after the hour
+    - Displayed: When available
     """)
     
     st.markdown("---")
@@ -317,34 +104,30 @@ with st.sidebar:
     next_hour = (now.hour + 1) % 24
     minutes_to_next = 60 - now.minute
     
-    st.markdown("### 🔄 NEXT UPDATE CYCLE")
+    st.markdown("### 🔄 Next Update")
     st.markdown(f"""
-    ```
-    PREDICTIONS AT: {next_hour:02d}:00 UTC
-    AVAILABLE AT:   {next_hour:02d}:01:30 UTC
-    CURRENT TIME:   {now.strftime('%H:%M:%S UTC')}
-    COUNTDOWN:      {minutes_to_next} minutes
-    ```
+    - **Predictions generated at:** {next_hour:02d}:00 UTC
+    - **Available at:** {next_hour:02d}:01:30 UTC
+    - **Current time:** {now.strftime('%H:%M:%S UTC')}
     """)
     
     st.markdown("---")
-    st.markdown("### 📡 SYSTEM ARCHITECTURE")
+    st.markdown("### 📡 Data Pipeline")
     st.markdown("""
-    ```python
-    while True:
-        fetch_live_aqi()
-        if hour_mark:
-            generate_predictions()
-            sleep(90)  # Sync delay
-            upload_to_cloud()
-        display_dashboard()
-    ```
+    1. **Hourly Schedule:**
+       - :00:00 → Script starts
+       - :00:30 → Predictions generated
+       - :01:30 → Predictions uploaded
+    
+    2. **Dashboard:**
+       - Shows 'Fetching...' for 90 seconds
+       - Then displays latest predictions
     """)
 
-# Cache functions
-@st.cache_data(ttl=300)
+# Cache functions - current AQI every 5 min
+@st.cache_data(ttl=300)  # Cache for 5 minutes
 def get_current_aqi():
-    """Get current AQI from Open-Meteo"""
+    """Get current AQI from Open-Meteo (live API)"""
     try:
         url = "https://air-quality-api.open-meteo.com/v1/air-quality"
         params = {"latitude": 24.8607, "longitude": 67.0011, "current": "pm2_5"}
@@ -359,27 +142,31 @@ def get_current_aqi():
             "aqi": aqi,
             "pm25": pm25,
             "timestamp": data['current']['time'],
-            "location": "KARACHI_24.86N_67.00E",
-            "source": "OPEN-METEO_LIVE_API"
+            "location": "Karachi (24.86°N, 67.00°E)",
+            "source": "Open-Meteo Live API"
         }
     except Exception as e:
+        # Fallback to demo data if API fails
         return {
             "aqi": 85,
             "pm25": 30.1,
             "timestamp": datetime.now().isoformat(),
-            "location": "KARACHI_FALLBACK",
-            "source": "BACKUP_DATA_STREAM"
+            "location": "Karachi",
+            "source": "Fallback Data (API Error)"
         }
 
-@st.cache_data(ttl=1800)
+# NEW FUNCTION: Get predictions with 90-second delay
+@st.cache_data(ttl=1800)  # Cache for 30 minutes, but we'll control refresh manually
 def get_latest_predictions():
-    """Get latest predictions from Hugging Face"""
+    """Get latest predictions from Hugging Face with delay check"""
     now = datetime.now()
     
+    # Check if we should wait (if it's within 90 seconds of the hour)
     if now.minute == 0 and now.second < 90:
-        return {"status": "waiting", "message": "NEURAL_NET_PROCESSING", "retry_after": 90 - now.second}
+        return {"status": "waiting", "message": "Predictions being generated...", "retry_after": 90 - now.second}
     
     try:
+        # Try to get the latest.json file first
         latest_url = "https://huggingface.co/Syed110-3/karachi-aqi-predictor/resolve/main/predictions/latest.json"
         
         try:
@@ -387,24 +174,31 @@ def get_latest_predictions():
             if response.status_code == 200:
                 prediction_data = response.json()
                 
+                # Check if predictions are fresh (within last 2 hours)
                 if 'prediction_timestamp' in prediction_data:
                     pred_time = datetime.fromisoformat(prediction_data['prediction_timestamp'].replace('Z', '+00:00'))
                     hours_old = (now - pred_time).total_seconds() / 3600
                     
                     if hours_old < 2:
+                        # Ensure all values are proper floats
                         if 'predictions' in prediction_data:
                             for key in prediction_data['predictions']:
                                 prediction_data['predictions'][key] = float(prediction_data['predictions'][key])
                         prediction_data['status'] = "success"
                         return prediction_data
+                
+                # If no timestamp or old, fall through to search for latest
         except:
             pass
         
+        # Fallback: Search for most recent prediction file
         api_url = "https://huggingface.co/api/models/Syed110-3/karachi-aqi-predictor/tree/main/predictions"
         response = requests.get(api_url, timeout=10)
         
         if response.status_code == 200:
             files = response.json()
+            
+            # Find all prediction JSON files
             pred_files = []
             for item in files:
                 if isinstance(item, dict) and 'path' in item:
@@ -412,9 +206,11 @@ def get_latest_predictions():
                         pred_files.append(item)
             
             if pred_files:
+                # Get most recent file (sorted by filename which contains timestamp)
                 pred_files.sort(key=lambda x: x['path'], reverse=True)
                 latest_file = pred_files[0]['path']
                 
+                # Download the latest prediction file
                 file_url = f"https://huggingface.co/Syed110-3/karachi-aqi-predictor/resolve/main/{latest_file}"
                 pred_response = requests.get(file_url, timeout=10)
                 
@@ -423,6 +219,7 @@ def get_latest_predictions():
                     prediction_data['status'] = "success"
                     return prediction_data
         
+        # If everything fails, return demo data
         return {
             "status": "demo",
             "timestamp": now.isoformat(),
@@ -431,13 +228,13 @@ def get_latest_predictions():
                 "day2": 90.2,
                 "day3": 92.8
             },
-            "message": "DEMO_MODE_ACTIVE"
+            "message": "Using demo predictions - check back after the hour"
         }
                 
     except Exception as e:
         return {
             "status": "error",
-            "message": f"ERROR: {str(e)[:100]}",
+            "message": f"Error: {str(e)[:100]}",
             "timestamp": now.isoformat(),
             "predictions": {
                 "day1": 85.0,
@@ -446,65 +243,69 @@ def get_latest_predictions():
             }
         }
 
+# Function to get AQI level information
 def get_aqi_info(aqi):
-    """Get AQI level information"""
+    """Get AQI level, color, icon, and health message"""
     if aqi <= 50:
         return {
-            "level": "OPTIMAL",
-            "color": "#00ff9f",
-            "icon": "✓",
-            "health": "AIR QUALITY: OPTIMAL",
-            "advice": "ALL_SYSTEMS_GREEN // NO_RESTRICTIONS",
-            "color_class": "aqi-cyber-good"
+            "level": "GOOD",
+            "color": "#10B981",
+            "icon": "✅",
+            "health": "Air quality is satisfactory.",
+            "advice": "Ideal for outdoor activities. No restrictions needed.",
+            "color_class": "aqi-good"
         }
     elif aqi <= 100:
         return {
-            "level": "ACCEPTABLE", 
-            "color": "#ffff00",
-            "icon": "⚠",
-            "health": "AIR QUALITY: ACCEPTABLE",
-            "advice": "SENSITIVE_USERS // LIMIT_EXPOSURE",
-            "color_class": "aqi-cyber-moderate"
+            "level": "MODERATE", 
+            "color": "#F59E0B",
+            "icon": "⚠️",
+            "health": "Acceptable air quality.",
+            "advice": "Sensitive individuals should limit outdoor exertion.",
+            "color_class": "aqi-moderate"
         }
     elif aqi <= 150:
         return {
-            "level": "HAZARDOUS",
-            "color": "#ff6b00",
-            "icon": "⚠",
-            "health": "AIR QUALITY: HAZARDOUS",
-            "advice": "VULNERABLE_GROUPS // STAY_INDOORS",
-            "color_class": "aqi-cyber-unhealthy"
+            "level": "UNHEALTHY",
+            "color": "#EF4444",
+            "icon": "🚨",
+            "health": "Unhealthy for sensitive groups.",
+            "advice": "Children, elderly, and those with respiratory issues should avoid outdoor activities.",
+            "color_class": "aqi-unhealthy"
         }
     elif aqi <= 200:
         return {
-            "level": "CRITICAL",
-            "color": "#ff0055",
-            "icon": "✗",
-            "health": "AIR QUALITY: CRITICAL",
-            "advice": "ALL_USERS // INDOOR_PROTOCOL_ACTIVE",
-            "color_class": "aqi-cyber-very-unhealthy"
+            "level": "VERY UNHEALTHY",
+            "color": "#8B5CF6",
+            "icon": "😷",
+            "health": "Unhealthy for everyone.",
+            "advice": "Everyone should avoid outdoor activities. Close windows, use air purifiers.",
+            "color_class": "aqi-very-unhealthy"
         }
     else:
         return {
-            "level": "EMERGENCY",
-            "color": "#ff00ff",
-            "icon": "☣",
-            "health": "AIR QUALITY: EMERGENCY",
-            "advice": "LOCKDOWN_MODE // PURIFIER_REQUIRED",
-            "color_class": "aqi-cyber-hazardous"
+            "level": "HAZARDOUS",
+            "color": "#7C3AED",
+            "icon": "☣️",
+            "health": "Health warning: emergency conditions.",
+            "advice": "Everyone should avoid all outdoor activities. Stay indoors with air purifiers.",
+            "color_class": "aqi-hazardous"
         }
 
-# Get data
+# Get current AQI (always available)
 current_data = get_current_aqi()
 current_aqi = current_data['aqi']
 aqi_info = get_aqi_info(current_aqi)
+
+# Get predictions with delay logic
 predictions = get_latest_predictions()
 
-# Timing
+# Calculate timing info
 now = datetime.now()
 next_hour_start = datetime(now.year, now.month, now.day, now.hour, 0, 0) + timedelta(hours=1)
 predictions_available_time = next_hour_start + timedelta(seconds=90)
 
+# Determine if we should show loading state
 show_loading = False
 if now.minute == 0 and now.second < 90:
     show_loading = True
@@ -513,152 +314,158 @@ elif predictions.get('status') == 'waiting':
     show_loading = True
     seconds_remaining = predictions.get('retry_after', 90)
 
-# Status badge
+# Update badge - MODIFIED to show loading state
 if show_loading:
     st.markdown(f"""
-    <div class="cyber-badge" style="background: linear-gradient(45deg, #ffff00, #ff6b00);">
-        <div class="loading-cyber"></div>
-        AI NEURAL NET PROCESSING... T-{seconds_remaining}s
+    <div class="update-badge" style="background: linear-gradient(45deg, #F59E0B, #D97706);">
+        <div class="loading-spinner"></div>
+        AI Predictions generating... Available in {seconds_remaining} seconds
     </div>
     """, unsafe_allow_html=True)
 else:
     next_update = datetime(now.year, now.month, now.day, now.hour, 0, 0) + timedelta(hours=1)
     minutes_remaining = int((next_update - now).total_seconds() / 60)
     st.markdown(f"""
-    <div class="cyber-badge">
-        <span class='status-dot status-online'></span>
-        LIVE SYSTEM ACTIVE // NEXT_AI_CYCLE: {next_update.strftime('%H:%M')} UTC [{minutes_remaining}m]
+    <div class="update-badge">
+        🔄 Live AQI updates every 5 min | Next predictions: {next_update.strftime('%H:%M')} UTC ({minutes_remaining} min)
     </div>
     """, unsafe_allow_html=True)
 
-# MAIN DASHBOARD
-st.markdown("## 📊 REAL-TIME AIR QUALITY STATUS")
+# MAIN DASHBOARD LAYOUT
+# Row 1: Current AQI Status (ALWAYS SHOWN)
+st.markdown("## 📊 Current Air Quality Status")
 
 col1, col2, col3 = st.columns([2, 1, 1])
 
 with col1:
-    st.markdown(f'<div class="cyber-card {aqi_info["color_class"]}">', unsafe_allow_html=True)
-    st.markdown(f"### {aqi_info['icon']} LIVE AQI MONITOR")
+    # Current AQI Card
+    st.markdown(f'<div class="metric-card {aqi_info["color_class"]}">', unsafe_allow_html=True)
+    st.markdown(f"### {aqi_info['icon']} LIVE AIR QUALITY INDEX")
     
-    st.markdown(f"<h1 class='glitch-text' style='color: {aqi_info['color']};'>{current_aqi:.0f}</h1>", unsafe_allow_html=True)
+    # Large AQI number
+    st.markdown(f"<h1 style='font-size: 5rem; margin: 0; color: {aqi_info['color']};'>{current_aqi:.0f}</h1>", unsafe_allow_html=True)
     
-    st.markdown(f"<div class='metric-cyber'>STATUS: {aqi_info['level']}</div>", unsafe_allow_html=True)
-    st.markdown(f"**PM2.5_CONCENTRATION:** `{current_data['pm25']:.1f} µg/m³`")
-    st.markdown(f"**LOCATION:** `{current_data['location']}`")
-    st.markdown(f"**TIMESTAMP:** `{current_data['timestamp'][11:16]} UTC`")
-    st.markdown(f"**DATA_SOURCE:** `{current_data['source']}`")
+    # Level and details
+    st.markdown(f"**Level:** {aqi_info['level']}")
+    st.markdown(f"**PM2.5 Concentration:** {current_data['pm25']:.1f} µg/m³")
+    st.markdown(f"**Location:** {current_data['location']}")
+    st.markdown(f"**Recorded:** {current_data['timestamp'][11:16]} UTC")
+    st.markdown(f"**Source:** {current_data['source']}")
     
+    # AQI scale
     st.markdown("---")
-    st.markdown("**[AQI_SCALE]** 0-50 OPTIMAL | 51-100 ACCEPTABLE | 101-150 HAZARDOUS | 151-200 CRITICAL | 201+ EMERGENCY")
+    st.markdown("**AQI Scale:** 0-50 (Good) | 51-100 (Moderate) | 101-150 (Unhealthy) | 151-200 (Very Unhealthy) | 201+ (Hazardous)")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col2:
-    st.markdown(f'<div class="cyber-card">', unsafe_allow_html=True)
-    st.markdown(f"### 🏥 HEALTH PROTOCOL")
+    # Health Status Card
+    st.markdown(f'<div class="metric-card">', unsafe_allow_html=True)
+    st.markdown(f"### 🏥 Health Status")
     st.markdown(f"**{aqi_info['health']}**")
     
     st.markdown("---")
-    st.markdown("#### >> ACTIONS:")
+    st.markdown("#### Recommended Actions:")
     
     if current_aqi <= 50:
         st.success("""
-        ```
-        ✓ OUTDOOR_ACCESS: FULL
-        ✓ VENTILATION: ENABLED
-        ✓ PROTECTION: NONE
-        ```
+        - ✅ All outdoor activities safe
+        - ✅ Windows can be opened
+        - ✅ No masks needed
         """)
     elif current_aqi <= 100:
         st.warning("""
-        ```
-        ⚠ SENSITIVE: CAUTION
-        ✓ OTHERS: NOMINAL
-        ⚠ MASKS: OPTIONAL
-        ```
+        - ⚠️ Sensitive people: Limit exertion
+        - ✅ Others: Normal activities OK
+        - ⚠️ Consider masks if sensitive
         """)
     elif current_aqi <= 150:
         st.error("""
-        ```
-        ✗ SENSITIVE: INDOOR
-        ⚠ OTHERS: LIMITED
-        ⚠ MASKS: REQUIRED
-        ```
+        - ❌ Sensitive groups: Stay indoors
+        - ⚠️ Others: Limit outdoor time
+        - 😷 Wear masks outdoors
         """)
     else:
         st.error("""
-        ```
-        ✗ ALL: STAY INDOORS
-        ✗ WINDOWS: SEALED
-        ⚠ MASKS: N95 REQUIRED
-        ⚠ PURIFIERS: ACTIVE
-        ```
+        - ❌ Everyone: Stay indoors
+        - ❌ Close all windows
+        - 😷 Wear N95 masks if outside
+        - 💨 Use air purifiers
         """)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 with col3:
-    st.markdown(f'<div class="cyber-card">', unsafe_allow_html=True)
-    st.markdown(f"### 🤖 AI SYSTEM STATUS")
+    # Automation Status Card
+    st.markdown(f'<div class="metric-card">', unsafe_allow_html=True)
+    st.markdown(f"### 🤖 Automation Status")
     
     if show_loading:
-        st.markdown(f"**AI_STATE:** ⏳ PROCESSING")
-        st.markdown(f"**ETA:** `{seconds_remaining}s`")
-        st.markdown(f"**READY_AT:** `{predictions_available_time.strftime('%H:%M:%S UTC')}`")
+        st.markdown(f"**AI Predictions:** ⏳ Generating...")
+        st.markdown(f"**Available in:** {seconds_remaining} seconds")
+        st.markdown(f"**Available at:** {predictions_available_time.strftime('%H:%M:%S UTC')}")
         
+        # Progress bar
         progress = 1 - (seconds_remaining / 90)
         st.progress(progress)
     else:
         if predictions.get('status') == 'success' and 'prediction_timestamp' in predictions:
             pred_time = datetime.fromisoformat(predictions['prediction_timestamp'].replace('Z', '+00:00'))
             minutes_old = int((now - pred_time).total_seconds() / 60)
-            st.markdown(f"**AI_STATE:** <span class='status-dot status-online'></span> ONLINE", unsafe_allow_html=True)
-            st.markdown(f"**GENERATED:** `{pred_time.strftime('%H:%M:%S UTC')}`")
-            st.markdown(f"**AGE:** `{minutes_old} minutes`")
+            st.markdown(f"**AI Predictions:** ✅ Available")
+            st.markdown(f"**Generated:** {pred_time.strftime('%H:%M:%S UTC')}")
+            st.markdown(f"**Age:** {minutes_old} minutes")
         else:
-            st.markdown(f"**AI_STATE:** <span class='status-dot status-warning'></span> DEMO", unsafe_allow_html=True)
+            st.markdown(f"**AI Predictions:** ℹ️ Demo/Historical")
     
     st.markdown("---")
     next_hour = (now.hour + 1) % 24
-    st.markdown(f"#### 📅 NEXT CYCLE")
-    st.markdown(f"**START:** `{next_hour:02d}:00:00`")
-    st.markdown(f"**READY:** `{next_hour:02d}:01:30`")
+    st.markdown(f"#### 📅 Next Generation")
+    st.markdown(f"**Starts at:** {next_hour:02d}:00:00 UTC")
+    st.markdown(f"**Available at:** {next_hour:02d}:01:30 UTC")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# 3-Day Forecast
+# Row 2: 3-Day Forecast - WITH LOADING STATE
 st.markdown("---")
-st.markdown("## 📈 AI NEURAL FORECAST // 72-HOUR PROJECTION")
+st.markdown("## 📈 3-Day AQI Forecast")
 
 if show_loading:
-    st.markdown('<div class="prediction-cyber-loading">', unsafe_allow_html=True)
-    st.markdown(f"### <div class='loading-cyber'></div> NEURAL NETWORK PROCESSING")
+    # SHOW LOADING STATE FOR PREDICTIONS
+    st.markdown('<div class="prediction-loading">', unsafe_allow_html=True)
+    st.markdown(f"### <div class='loading-spinner'></div> AI Predictions Generating")
     
     st.markdown(f"""
-    **[SYSTEM_STATUS]** Generating predictions...
+    **Status:** Your predictions are being generated right now!
     
-    **[PROCESS_PIPELINE]**
-    ```
-    1. SCRIPT_INIT:      {now.replace(second=0).strftime('%H:%M:%S')} ✓
-    2. AQI_FETCH:        COMPLETE ✓
-    3. ML_MODELS:        LOADED ✓
-    4. PREDICTIONS:      PROCESSING...
-    5. CLOUD_UPLOAD:     PENDING...
-    ```
+    **Process:**
+    1. Script started at {now.replace(second=0).strftime('%H:%M:%S UTC')}
+    2. Current AQI fetched: ✓
+    3. ML models loaded: ✓
+    4. Predictions generated: In progress...
+    5. Uploading to Hugging Face: Waiting...
     
-    **[TIME_REMAINING]** {seconds_remaining} seconds
+    **Available in:** {seconds_remaining} seconds
     """)
     
-    st.markdown("**⚡ PREDICTIONS READY SOON...**")
+    # Show static countdown (can't do dynamic countdown in Streamlit without refresh)
+    st.markdown(f"**⏳ Refreshing automatically in {seconds_remaining} seconds...**")
+    
+    st.markdown("**🎉 Predictions should now be available!**")
+    st.markdown("The page will refresh automatically when ready...")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    if st.button("🔄 CHECK STATUS NOW", type="primary"):
+    # Add a manual refresh button
+    if st.button("🔄 Check for Predictions Now", type="primary"):
         st.cache_data.clear()
         st.rerun()
     
 elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions' in predictions:
-    days = ['NOW', 'T+24H', 'T+48H', 'T+72H']
+    # SHOW ACTUAL PREDICTIONS
+    # Prepare forecast data
+    days = ['Today', 'Tomorrow', 'Day 2', 'Day 3']
     
+    # Get values
     values = [current_aqi]
     for i in range(1, 4):
         day_key = f'day{i}'
@@ -667,6 +474,7 @@ elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions'
         else:
             values.append(float(current_aqi) + i * 3)
     
+    # Create colors and info for each day
     colors = []
     levels = []
     for value in values:
@@ -674,6 +482,7 @@ elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions'
         colors.append(info['color'])
         levels.append(info['level'])
     
+    # Forecast chart
     col_chart, col_table = st.columns([2, 1])
     
     with col_chart:
@@ -681,196 +490,166 @@ elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions'
             go.Bar(
                 x=days,
                 y=values,
-                marker=dict(
-                    color=colors,
-                    line=dict(color='#00ff9f', width=2)
-                ),
+                marker_color=colors,
                 text=[f"{v:.0f}" for v in values],
                 textposition='outside',
-                textfont=dict(size=18, color='#00ff9f', family='Orbitron'),
-                hovertemplate='<b>%{x}</b><br>AQI: %{y:.0f}<br>STATUS: %{customdata}<extra></extra>',
+                textfont=dict(size=16, color='black', weight='bold'),
+                hovertemplate='<b>%{x}</b><br>AQI: %{y:.0f}<br>Level: %{customdata}<extra></extra>',
                 customdata=levels
             )
         ])
         
         fig.update_layout(
             height=400,
-            yaxis_title="AQI INDEX",
+            yaxis_title="AQI",
             xaxis_title="",
             showlegend=False,
-            plot_bgcolor='rgba(10, 14, 39, 0.8)',
-            paper_bgcolor='rgba(10, 14, 39, 0.5)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
             yaxis=dict(
                 range=[0, max(values) * 1.2],
-                gridcolor='rgba(0, 255, 159, 0.2)',
-                color='#00ff9f'
+                gridcolor='rgba(0,0,0,0.1)'
             ),
-            xaxis=dict(
-                color='#00ff9f'
-            ),
-            font=dict(size=14, family='Rajdhani', color='#00ff9f')
+            font=dict(size=14)
         )
         
         st.plotly_chart(fig, use_container_width=True)
     
     with col_table:
-        st.markdown("### FORECAST MATRIX")
+        st.markdown("### Forecast Details")
         
         forecast_data = []
         for i, (day, value, level, color) in enumerate(zip(days, values, levels, colors)):
             if i == 0:
                 forecast_data.append({
-                    'TIMEFRAME': day,
+                    'Day': day,
                     'AQI': f"{value:.0f}",
-                    'STATUS': level,
-                    'PM2.5': f"{(value * 0.354):.1f}",
-                    'DATA_TYPE': 'LIVE'
+                    'Level': level,
+                    'PM2.5': f"{(value * 0.354):.1f} µg/m³",
+                    'Status': 'Live'
                 })
             else:
                 change = value - current_aqi
                 forecast_data.append({
-                    'TIMEFRAME': day,
+                    'Day': day,
                     'AQI': f"{value:.0f}",
-                    'STATUS': level,
-                    'Δ': f"{change:+.0f}",
-                    'PM2.5': f"{(value * 0.354):.1f}",
-                    'DATA_TYPE': 'AI_PREDICT'
+                    'Level': level,
+                    'Change': f"{change:+.0f}",
+                    'PM2.5': f"{(value * 0.354):.1f} µg/m³",
+                    'Status': 'AI Forecast'
                 })
         
         forecast_df = pd.DataFrame(forecast_data)
         st.dataframe(
-            forecast_df.style.set_properties(**{
-                'background-color': '#0a0e27',
-                'color': '#00ff9f',
-                'border-color': '#00ff9f',
-                'border': '1px solid'
-            }),
+            forecast_df,
             use_container_width=True,
             hide_index=True,
             column_config={
-                "TIMEFRAME": st.column_config.TextColumn("TIMEFRAME", width="small"),
+                "Day": st.column_config.TextColumn("Day", width="small"),
                 "AQI": st.column_config.NumberColumn("AQI", width="small"),
-                "STATUS": st.column_config.TextColumn("STATUS", width="medium"),
-                "Δ": st.column_config.NumberColumn("Δ", width="small"),
+                "Level": st.column_config.TextColumn("Level", width="medium"),
+                "Change": st.column_config.NumberColumn("Change", width="small"),
                 "PM2.5": st.column_config.TextColumn("PM2.5", width="medium"),
-                "DATA_TYPE": st.column_config.TextColumn("SOURCE", width="small")
+                "Status": st.column_config.TextColumn("Status", width="small")
             }
         )
         
         # Show prediction source and timestamp
         if predictions.get('status') == 'success' and 'prediction_timestamp' in predictions:
             pred_time = datetime.fromisoformat(predictions['prediction_timestamp'].replace('Z', '+00:00'))
-            st.success(f"✅ NEURAL_NET_ACTIVE // GENERATED: {pred_time.strftime('%H:%M:%S UTC')}")
+            st.success(f"✅ AI Forecast generated: {pred_time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
         elif predictions.get('status') == 'demo':
-            st.warning("ℹ️ DEMO_MODE_ACTIVE // AI_PREDICTIONS @ :01:30")
+            st.warning("ℹ️ Using demo forecasts - AI predictions available at :01:30 after each hour")
         elif predictions.get('status') == 'error':
-            st.error("⚠️ NETWORK_ERROR // FALLBACK_DATA_ACTIVE")
+            st.error("⚠️ Error loading AI forecasts - showing demo data")
         else:
-            st.info("ℹ️ AI_CYCLE // HOURLY_AT_:01:30")
+            st.info("ℹ️ AI Forecast updates hourly at :01:30")
 else:
     # No predictions available at all
-    st.markdown('<div class="cyber-card">', unsafe_allow_html=True)
-    st.markdown("""
-    ### ⏳ AI FORECAST OFFLINE
+    st.warning("""
+    ### ⏳ AI Forecast Not Available
     
-    **[NEXT_GENERATION]**
-    - **INITIATE:** NEXT_HOUR (:00:00 UTC)
-    - **PROCESSING:** ~90 seconds
-    - **AVAILABLE:** :01:30 UTC
+    **Next forecast generation:**
+    - **Starts:** On the next hour (:00:00 UTC)
+    - **Available:** ~90 seconds later (:01:30 UTC)
     
-    **[CURRENT_STATUS]**
-    - LIVE_AQI: ✅ ONLINE
-    - AI_PREDICTIONS: ⏳ SCHEDULED
-    - SYSTEM: STANDBY
+    **Current status:**
+    - Live AQI: ✅ Available
+    - AI Predictions: ⏳ Generating on schedule
     """)
-    st.markdown('</div>', unsafe_allow_html=True)
     
     # Show when next predictions will be
     if now.minute >= 1 and now.second >= 30:
+        # Past the 90-second window, show next hour
         next_hour_time = datetime(now.year, now.month, now.day, now.hour + 1, 0, 0)
-        st.markdown(f"**NEXT_PREDICTIONS:** `{next_hour_time.strftime('%H:%M:30 UTC')}`")
+        st.info(f"**Next predictions:** Available at {next_hour_time.strftime('%H:%M:30 UTC')}")
 
-# System Architecture
+# Row 3: System Architecture
 st.markdown("---")
-st.markdown("## 🔧 SYSTEM ARCHITECTURE")
+st.markdown("## 🔧 System Architecture")
 
 col_info1, col_info2, col_info3 = st.columns(3)
 
 with col_info1:
-    st.markdown('<div class="cyber-card">', unsafe_allow_html=True)
-    st.markdown("### 📡 DATA PIPELINE")
+    st.markdown("### 📡 Live Data Pipeline")
     st.markdown("""
-    ```
-    1. STREAMLIT_DASHBOARD
-       ⬇ LIVE_FETCH
-       Open-Meteo_API
-    
-    2. GITHUB_ACTIONS
-       ⬇ HOURLY_CYCLE
-       :00:00 → INIT
-       :00:30 → PREDICT
-       :01:30 → UPLOAD
-    
-    3. HUGGING_FACE
-       ⬇ CLOUD_STORAGE
-       Models + Predictions
-    ```
-    """)
-    st.markdown('</div>', unsafe_allow_html=True)
+    <div class="pipeline-step">
+    1. **Streamlit Dashboard**<br>
+    ← Fetches live AQI from Open-Meteo
+    </div>
+    <div class="pipeline-step">
+    2. **GitHub Actions** (Hourly)<br>
+    • :00:00 → Script starts<br>
+    • :00:05 → Fetches current AQI<br>
+    • :00:30 → Makes predictions<br>
+    • :01:30 → Uploads to Hugging Face
+    </div>
+    <div class="pipeline-step">
+    3. **Dashboard Delay**<br>
+    • Waits 90 seconds after the hour<br>
+    • Then fetches latest predictions<br>
+    • Shows loading state in meantime
+    </div>
+    """, unsafe_allow_html=True)
 
 with col_info2:
-    st.markdown('<div class="cyber-card">', unsafe_allow_html=True)
-    st.markdown("### ⏰ SYNC_PROTOCOL")
+    st.markdown("### ⏰ Prediction Timing")
     st.markdown("""
-    **[DELAY_STRATEGY]**
-    ```
-    LIVE_AQI:    INSTANT
-    AI_PREDICT:  +90 SECONDS
+    **To Avoid Sync Issues:**
+    - Live AQI: Updates instantly
+    - AI Predictions: Delayed by 90 seconds
     
-    [WHY_90s?]
-    1. GITHUB_START:  30s
-    2. ML_LOAD:       20s  
-    3. PREDICT:       10s
-    4. UPLOAD:        10s
-    5. SAFETY_MARGIN: 20s
-    ```
+    **Why the Delay?**
+    1. GitHub Actions takes ~30s to start
+    2. ML models take ~20s to load
+    3. Upload to Hugging Face takes ~10s
     
-    **[RESULT]**
-    ✓ NO_SYNC_ISSUES
-    ✓ PREDICTIONS_MATCH_AQI
-    ✓ CLEAR_LOADING_STATE
+    **Result:**
+    - No more "previous hour" predictions
+    - Predictions always match current AQI
+    - Clear loading state for users
     """)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 with col_info3:
-    st.markdown('<div class="cyber-card">', unsafe_allow_html=True)
-    st.markdown("### 🚀 FEATURES")
+    st.markdown("### 🚀 Real-time Features")
     st.markdown("""
-    **[LIVE_MONITORING]**
-    ```
-    ✓ REAL-TIME_AQI
-    ✓ 5_MIN_REFRESH  
-    ✓ HEALTH_ALERTS
-    ✓ COLOR_CODED_UI
-    ```
+    **Live Monitoring:**
+    - Current AQI: Real-time API
+    - 5-minute auto-refresh
+    - Health recommendations
     
-    **[AI_FORECASTING]**
-    ```
-    ✓ 3_DAY_PREDICT
-    ✓ HOURLY_UPDATES
-    ✓ TREND_ANALYSIS  
-    ✓ CHANGE_METRICS
-    ```
+    **AI Forecasting:**
+    - 3-day predictions
+    - Generated hourly
+    - Available after 90s delay
+    - Always synchronized
     
-    **[USER_EXPERIENCE]**
-    ```
-    ✓ GENERATING_STATE
-    ✓ COUNTDOWN_TIMER
-    ✓ MANUAL_REFRESH
-    ✓ ERROR_HANDLING
-    ```
+    **User Experience:**
+    - Shows "Generating..." state
+    - Countdown timer
+    - Clear status messages
+    - Manual refresh option
     """)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")
@@ -879,81 +658,71 @@ col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
     if show_loading:
         st.markdown(f"""
-        **[SYSTEM_STATUS]** ⏳ NEURAL_NET_PROCESSING | 
-        **[ETA]** {seconds_remaining}s | 
-        **[TIME]** {now.strftime('%H:%M:%S UTC')}
+        **Dashboard Status:** ⏳ AI PREDICTIONS GENERATING | 
+        **Available in:** {seconds_remaining} seconds | 
+        **Current Time:** {now.strftime('%H:%M:%S UTC')}
         """)
     else:
         next_update = datetime(now.year, now.month, now.day, now.hour, 0, 0) + timedelta(hours=1)
         minutes_remaining = int((next_update - now).total_seconds() / 60)
         st.markdown(f"""
-        **[SYSTEM_STATUS]** 🟢 LIVE_SYSTEM_ACTIVE | 
-        **[TIME]** {now.strftime('%H:%M:%S UTC')} | 
-        **[NEXT_AI]** {next_update.strftime('%H:%M')} UTC [{minutes_remaining}m]
+        **Dashboard Status:** 🟢 LIVE & AUTO-UPDATING | 
+        **Current Time:** {now.strftime('%H:%M:%S UTC')} | 
+        **Next AI Predictions:** {next_update.strftime('%H:%M')} UTC ({minutes_remaining} min)
         """)
     
     st.caption("""
-    ⚡ LIVE_AQI: Open-Meteo_API | 🤖 AI_FORECAST: Hugging_Face_ML | 
-    ⚙️ AUTOMATION: GitHub_Actions | ⏱️ SYNC_DELAY: 90_SECONDS
+    Live AQI from Open-Meteo API | AI Forecasts from Hugging Face ML Models | 
+    Fully automated via GitHub Actions | Predictions delayed by 90s for synchronization
     """)
 
 with col_footer2:
-    if st.button("⚡ FORCE_REFRESH", use_container_width=True, type="primary"):
+    if st.button("🔄 Refresh Now", use_container_width=True, type="secondary"):
         st.cache_data.clear()
         st.rerun()
 
-# Add auto-refresh logic
+# Add auto-refresh logic using st.rerun() at appropriate times
+# Check if we're in the loading window and add a timed refresh
 if show_loading:
-    # If we're in the loading window and less than 30 seconds remain, auto-refresh
-    if seconds_remaining <= 30:
-        # Add a small delay then refresh
-        time.sleep(5)
+    # Set a timer to auto-refresh after the waiting period
+    if seconds_remaining <= 10:
+        # If less than 10 seconds remaining, refresh now
+        time.sleep(2)
         st.cache_data.clear()
         st.rerun()
 
 # Debug section
-with st.expander("🔧 DEBUG CONSOLE"):
-    tab1, tab2, tab3 = st.tabs(["LIVE_AQI", "AI_DATA", "SYSTEM"])
+with st.expander("🔧 Debug & Raw Data"):
+    tab1, tab2, tab3 = st.tabs(["Live AQI", "Predictions", "System"])
     
     with tab1:
-        st.markdown("### RAW_AQI_DATA")
+        st.write("### Live AQI Data")
         st.json(current_data)
         
-        if st.button("TEST_OPEN-METEO_API"):
+        # Test API
+        if st.button("Test Open-Meteo API"):
             test_url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=24.8607&longitude=67.0011&current=pm2_5"
             response = requests.get(test_url, timeout=5)
-            st.markdown("**[STATUS]**", unsafe_allow_html=True)
-            st.write(response.status_code)
-            st.markdown("**[RESPONSE]**", unsafe_allow_html=True)
+            st.write("Status:", response.status_code)
             st.json(response.json())
     
     with tab2:
-        st.markdown("### NEURAL_NET_DATA")
+        st.write("### AI Forecast Data")
         st.json(predictions)
         
-        st.markdown("### TIMING_MATRIX")
-        st.write(f"CURRENT_TIME: {now}")
-        st.write(f"SHOW_LOADING: {show_loading}")
+        st.write("### Timing Info")
+        st.write(f"Current time: {now}")
+        st.write(f"Show loading: {show_loading}")
         if show_loading:
-            st.write(f"SECONDS_REMAINING: {seconds_remaining}")
+            st.write(f"Seconds remaining: {seconds_remaining}")
         
         if 'predictions' in predictions:
-            st.markdown("### FORECAST_VALUES")
+            st.write("### Forecast Values")
             for day, value in predictions['predictions'].items():
-                st.metric(f"{day.upper()}_AQI", f"{value:.1f}")
+                st.metric(f"{day.upper()} AQI", f"{value:.1f}")
     
     with tab3:
-        st.markdown("### SYSTEM_METRICS")
-        st.metric("CURRENT_TIME_UTC", now.strftime('%H:%M:%S'))
-        st.metric("NEXT_HOUR_CYCLE", next_hour_start.strftime('%H:%M:%S'))
-        st.metric("PREDICTIONS_READY", predictions_available_time.strftime('%H:%M:%S'))
-        
-        # Performance metrics
-        st.markdown("### PERFORMANCE")
-        col_perf1, col_perf2 = st.columns(2)
-        with col_perf1:
-            st.metric("API_RESPONSE_TIME", "~200ms")
-            st.metric("PREDICTION_TIME", "~30s")
-        with col_perf2:
-            st.metric("DATA_FRESHNESS", "5min")
-            st.metric("SYSTEM_UPTIME", "99.9%")
+        st.write("### System Info")
+        st.metric("Current Time UTC", now.strftime('%Y-%m-%d %H:%M:%S'))
+        st.metric("Next Hour", next_hour_start.strftime('%H:%M:%S'))
+        st.metric("Predictions Available", predictions_available_time.strftime('%H:%M:%S'))
