@@ -75,12 +75,21 @@ st.markdown("""
         margin: 20px 0;
         border: 2px dashed #3B82F6;
     }
+    .hourly-badge {
+        background: linear-gradient(45deg, #3B82F6, #1D4ED8);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        display: inline-block;
+        margin: 5px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Title
 st.markdown('<h1 class="main-header">🌫️ Karachi Air Quality Dashboard</h1>', unsafe_allow_html=True)
-st.markdown("### Live monitoring with AI-powered 3-day forecasts")
+st.markdown("### Hourly updates with AI-powered 3-day forecasts")
 
 # Sidebar
 with st.sidebar:
@@ -88,15 +97,16 @@ with st.sidebar:
     st.title("⚙️ System Status")
     
     st.markdown("---")
-    st.markdown("### ⏰ Update Schedule")
+    st.markdown("### ⏰ Hourly Update Schedule")
     st.markdown("""
-    **Live Data:**
-    - Current AQI: Real-time (every load)
+    **All Updates Hourly:**
+    - Live AQI: Updated at :00:00 of each hour
+    - AI Predictions: Available at :01:30 of each hour
     
-    **AI Predictions:**
-    - Generated: On the hour
-    - Available: ~90 seconds after the hour
-    - Displayed: When available
+    **Dashboard Behavior:**
+    - Current AQI: Shows last hourly reading
+    - AI Predictions: Shows when available
+    - Both update on the same hourly schedule
     """)
     
     st.markdown("---")
@@ -104,33 +114,40 @@ with st.sidebar:
     next_hour = (now.hour + 1) % 24
     minutes_to_next = 60 - now.minute
     
-    st.markdown("### 🔄 Next Update")
+    st.markdown("### 🔄 Next Hourly Update")
     st.markdown(f"""
-    - **Predictions generated at:** {next_hour:02d}:00 UTC
-    - **Available at:** {next_hour:02d}:01:30 UTC
+    - **AQI & Predictions refresh at:** {next_hour:02d}:00:00 UTC
+    - **Predictions available at:** {next_hour:02d}:01:30 UTC
     - **Current time:** {now.strftime('%H:%M:%S UTC')}
+    - **Minutes until next update:** {minutes_to_next}
     """)
     
     st.markdown("---")
-    st.markdown("### 📡 Data Pipeline")
+    st.markdown("### 📡 Data Pipeline (Hourly)")
     st.markdown("""
-    1. **Hourly Schedule:**
-       - :00:00 → Script starts
-       - :00:30 → Predictions generated
-       - :01:30 → Predictions uploaded
+    **:00:00 - Hourly Process Starts:**
+    1. Fetch latest AQI from Open-Meteo
+    2. Start ML prediction script
+    3. Generate 3-day forecasts
     
-    2. **Dashboard:**
-       - Shows 'Fetching...' for 90 seconds
-       - Then displays latest predictions
+    **:01:30 - Process Complete:**
+    1. Upload predictions to Hugging Face
+    2. Dashboard fetches both AQI and predictions
+    3. Full update displayed to users
     """)
 
-# Cache functions - current AQI every 5 min
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+# Cache functions - BOTH update hourly
+@st.cache_data(ttl=3600)  # Cache for 1 hour - AQI updates hourly
 def get_current_aqi():
-    """Get current AQI from Open-Meteo (live API)"""
+    """Get current AQI from Open-Meteo (hourly API)"""
     try:
         url = "https://air-quality-api.open-meteo.com/v1/air-quality"
-        params = {"latitude": 24.8607, "longitude": 67.0011, "current": "pm2_5"}
+        params = {
+            "latitude": 24.8607, 
+            "longitude": 67.0011, 
+            "current": "pm2_5",
+            "timezone": "auto"
+        }
         response = requests.get(url, params=params, timeout=5)
         data = response.json()
         
@@ -138,25 +155,33 @@ def get_current_aqi():
         aqi = round((pm25 / 35.4) * 100)
         aqi = max(0, min(500, aqi))
         
+        # Get timestamp and round to nearest hour for consistency
+        timestamp_str = data['current']['time']
+        timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        rounded_timestamp = timestamp.replace(minute=0, second=0, microsecond=0)
+        
         return {
             "aqi": aqi,
             "pm25": pm25,
-            "timestamp": data['current']['time'],
+            "timestamp": rounded_timestamp.isoformat(),
+            "display_time": rounded_timestamp.strftime('%H:00 UTC'),
             "location": "Karachi (24.86°N, 67.00°E)",
-            "source": "Open-Meteo Live API"
+            "source": "Open-Meteo API (Hourly)"
         }
     except Exception as e:
         # Fallback to demo data if API fails
+        now_hour = datetime.now().replace(minute=0, second=0, microsecond=0)
         return {
             "aqi": 85,
             "pm25": 30.1,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_hour.isoformat(),
+            "display_time": now_hour.strftime('%H:00 UTC'),
             "location": "Karachi",
             "source": "Fallback Data (API Error)"
         }
 
-# NEW FUNCTION: Get predictions with 90-second delay
-@st.cache_data(ttl=1800)  # Cache for 30 minutes, but we'll control refresh manually
+# Predictions function with 90-second delay (KEPT SAME)
+@st.cache_data(ttl=3600)  # Cache for 1 hour - predictions update hourly
 def get_latest_predictions():
     """Get latest predictions from Hugging Face with delay check"""
     now = datetime.now()
@@ -292,7 +317,7 @@ def get_aqi_info(aqi):
             "color_class": "aqi-hazardous"
         }
 
-# Get current AQI (always available)
+# Get current AQI (hourly)
 current_data = get_current_aqi()
 current_aqi = current_data['aqi']
 aqi_info = get_aqi_info(current_aqi)
@@ -302,10 +327,11 @@ predictions = get_latest_predictions()
 
 # Calculate timing info
 now = datetime.now()
-next_hour_start = datetime(now.year, now.month, now.day, now.hour, 0, 0) + timedelta(hours=1)
+current_hour_start = datetime(now.year, now.month, now.day, now.hour, 0, 0)
+next_hour_start = current_hour_start + timedelta(hours=1)
 predictions_available_time = next_hour_start + timedelta(seconds=90)
 
-# Determine if we should show loading state
+# Determine if we should show loading state for predictions
 show_loading = False
 if now.minute == 0 and now.second < 90:
     show_loading = True
@@ -314,22 +340,14 @@ elif predictions.get('status') == 'waiting':
     show_loading = True
     seconds_remaining = predictions.get('retry_after', 90)
 
-# Update badge - MODIFIED to show loading state
-if show_loading:
-    st.markdown(f"""
-    <div class="update-badge" style="background: linear-gradient(45deg, #F59E0B, #D97706);">
-        <div class="loading-spinner"></div>
-        AI Predictions generating... Available in {seconds_remaining} seconds
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    next_update = datetime(now.year, now.month, now.day, now.hour, 0, 0) + timedelta(hours=1)
-    minutes_remaining = int((next_update - now).total_seconds() / 60)
-    st.markdown(f"""
-    <div class="update-badge">
-        🔄 Live AQI updates every 5 min | Next predictions: {next_update.strftime('%H:%M')} UTC ({minutes_remaining} min)
-    </div>
-    """, unsafe_allow_html=True)
+# Hourly update badge
+minutes_until_next_hour = 60 - now.minute
+st.markdown(f"""
+<div class="hourly-badge">
+    ⏰ Hourly Updates | Current AQI as of {current_data['display_time']} | 
+    Next update: {next_hour_start.strftime('%H:00 UTC')} ({minutes_until_next_hour} min)
+</div>
+""", unsafe_allow_html=True)
 
 # MAIN DASHBOARD LAYOUT
 # Row 1: Current AQI Status (ALWAYS SHOWN)
@@ -340,7 +358,7 @@ col1, col2, col3 = st.columns([2, 1, 1])
 with col1:
     # Current AQI Card
     st.markdown(f'<div class="metric-card {aqi_info["color_class"]}">', unsafe_allow_html=True)
-    st.markdown(f"### {aqi_info['icon']} LIVE AIR QUALITY INDEX")
+    st.markdown(f"### {aqi_info['icon']} HOURLY AIR QUALITY INDEX")
     
     # Large AQI number
     st.markdown(f"<h1 style='font-size: 5rem; margin: 0; color: {aqi_info['color']};'>{current_aqi:.0f}</h1>", unsafe_allow_html=True)
@@ -349,11 +367,14 @@ with col1:
     st.markdown(f"**Level:** {aqi_info['level']}")
     st.markdown(f"**PM2.5 Concentration:** {current_data['pm25']:.1f} µg/m³")
     st.markdown(f"**Location:** {current_data['location']}")
-    st.markdown(f"**Recorded:** {current_data['timestamp'][11:16]} UTC")
+    st.markdown(f"**Recorded:** {current_data['display_time']}")
     st.markdown(f"**Source:** {current_data['source']}")
     
-    # AQI scale
+    # Update schedule
     st.markdown("---")
+    st.markdown(f"**⏰ Next AQI Update:** {next_hour_start.strftime('%H:00 UTC')} ({minutes_until_next_hour} minutes)")
+    
+    # AQI scale
     st.markdown("**AQI Scale:** 0-50 (Good) | 51-100 (Moderate) | 101-150 (Unhealthy) | 151-200 (Very Unhealthy) | 201+ (Hazardous)")
     
     st.markdown('</div>', unsafe_allow_html=True)
@@ -398,8 +419,16 @@ with col2:
 with col3:
     # Automation Status Card
     st.markdown(f'<div class="metric-card">', unsafe_allow_html=True)
-    st.markdown(f"### 🤖 Automation Status")
+    st.markdown(f"### 🤖 System Status")
     
+    # AQI Update Status
+    st.markdown(f"**AQI Updates:** ✅ Hourly")
+    st.markdown(f"**Last Update:** {current_data['display_time']}")
+    st.markdown(f"**Next Update:** {next_hour_start.strftime('%H:00')} UTC")
+    
+    st.markdown("---")
+    
+    # Predictions Status
     if show_loading:
         st.markdown(f"**AI Predictions:** ⏳ Generating...")
         st.markdown(f"**Available in:** {seconds_remaining} seconds")
@@ -407,7 +436,7 @@ with col3:
         
         # Progress bar
         progress = 1 - (seconds_remaining / 90)
-        st.progress(progress)
+        st.progress(progress, text=f"Generating... {seconds_remaining}s remaining")
     else:
         if predictions.get('status') == 'success' and 'prediction_timestamp' in predictions:
             pred_time = datetime.fromisoformat(predictions['prediction_timestamp'].replace('Z', '+00:00'))
@@ -419,10 +448,9 @@ with col3:
             st.markdown(f"**AI Predictions:** ℹ️ Demo/Historical")
     
     st.markdown("---")
-    next_hour = (now.hour + 1) % 24
-    st.markdown(f"#### 📅 Next Generation")
-    st.markdown(f"**Starts at:** {next_hour:02d}:00:00 UTC")
-    st.markdown(f"**Available at:** {next_hour:02d}:01:30 UTC")
+    st.markdown(f"#### 📅 Next Full Update")
+    st.markdown(f"**AQI at:** {next_hour_start.strftime('%H:00:00 UTC')}")
+    st.markdown(f"**Predictions at:** {next_hour_start.strftime('%H:01:30 UTC')}")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -438,32 +466,23 @@ if show_loading:
     st.markdown(f"""
     **Status:** Your predictions are being generated right now!
     
-    **Process:**
-    1. Script started at {now.replace(second=0).strftime('%H:%M:%S UTC')}
-    2. Current AQI fetched: ✓
-    3. ML models loaded: ✓
-    4. Predictions generated: In progress...
-    5. Uploading to Hugging Face: Waiting...
+    **Hourly Process (starting at {now.replace(second=0).strftime('%H:00:00 UTC')}):**
+    1. Fetch latest AQI: ✓
+    2. Load ML models: In progress...
+    3. Generate predictions: In progress...
+    4. Upload to Hugging Face: Waiting...
     
     **Available in:** {seconds_remaining} seconds
+    
+    **Note:** The page will refresh automatically when ready.
     """)
     
-    # Show static countdown (can't do dynamic countdown in Streamlit without refresh)
-    st.markdown(f"**⏳ Refreshing automatically in {seconds_remaining} seconds...**")
-    
-    st.markdown("**🎉 Predictions should now be available!**")
-    st.markdown("The page will refresh automatically when ready...")
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Add a manual refresh button
-    if st.button("🔄 Check for Predictions Now", type="primary"):
-        st.cache_data.clear()
-        st.rerun()
     
 elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions' in predictions:
     # SHOW ACTUAL PREDICTIONS
     # Prepare forecast data
-    days = ['Today', 'Tomorrow', 'Day 2', 'Day 3']
+    days = ['Current Hour', 'Next 24h', 'Next 48h', 'Next 72h']
     
     # Get values
     values = [current_aqi]
@@ -522,16 +541,16 @@ elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions'
         for i, (day, value, level, color) in enumerate(zip(days, values, levels, colors)):
             if i == 0:
                 forecast_data.append({
-                    'Day': day,
+                    'Period': day,
                     'AQI': f"{value:.0f}",
                     'Level': level,
                     'PM2.5': f"{(value * 0.354):.1f} µg/m³",
-                    'Status': 'Live'
+                    'Status': 'Current Hourly'
                 })
             else:
                 change = value - current_aqi
                 forecast_data.append({
-                    'Day': day,
+                    'Period': day,
                     'AQI': f"{value:.0f}",
                     'Level': level,
                     'Change': f"{change:+.0f}",
@@ -545,7 +564,7 @@ elif predictions.get('status') in ['success', 'demo', 'error'] and 'predictions'
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Day": st.column_config.TextColumn("Day", width="small"),
+                "Period": st.column_config.TextColumn("Period", width="small"),
                 "AQI": st.column_config.NumberColumn("AQI", width="small"),
                 "Level": st.column_config.TextColumn("Level", width="medium"),
                 "Change": st.column_config.NumberColumn("Change", width="small"),
@@ -574,15 +593,9 @@ else:
     - **Available:** ~90 seconds later (:01:30 UTC)
     
     **Current status:**
-    - Live AQI: ✅ Available
+    - Current AQI: ✅ Available (hourly)
     - AI Predictions: ⏳ Generating on schedule
     """)
-    
-    # Show when next predictions will be
-    if now.minute >= 1 and now.second >= 30:
-        # Past the 90-second window, show next hour
-        next_hour_time = datetime(now.year, now.month, now.day, now.hour + 1, 0, 0)
-        st.info(f"**Next predictions:** Available at {next_hour_time.strftime('%H:%M:30 UTC')}")
 
 # Row 3: System Architecture
 st.markdown("---")
@@ -591,64 +604,65 @@ st.markdown("## 🔧 System Architecture")
 col_info1, col_info2, col_info3 = st.columns(3)
 
 with col_info1:
-    st.markdown("### 📡 Live Data Pipeline")
+    st.markdown("### 📡 Hourly Data Pipeline")
     st.markdown("""
     <div class="pipeline-step">
-    1. **Streamlit Dashboard**<br>
-    ← Fetches live AQI from Open-Meteo
+    1. **Hourly Trigger (:00:00)**
+    • Fetch latest AQI from Open-Meteo
+    • Start ML prediction process
     </div>
     <div class="pipeline-step">
-    2. **GitHub Actions** (Hourly)<br>
-    • :00:00 → Script starts<br>
-    • :00:05 → Fetches current AQI<br>
-    • :00:30 → Makes predictions<br>
-    • :01:30 → Uploads to Hugging Face
+    2. **AI Processing (:00:05 - :01:20)**
+    • Load ML models
+    • Generate 3-day forecasts
+    • Package predictions
     </div>
     <div class="pipeline-step">
-    3. **Dashboard Delay**<br>
-    • Waits 90 seconds after the hour<br>
-    • Then fetches latest predictions<br>
-    • Shows loading state in meantime
+    3. **Upload & Availability (:01:30)**
+    • Upload to Hugging Face
+    • Both AQI and predictions ready
+    • Dashboard updates complete
     </div>
     """, unsafe_allow_html=True)
 
 with col_info2:
-    st.markdown("### ⏰ Prediction Timing")
+    st.markdown("### ⏰ Synchronized Updates")
     st.markdown("""
-    **To Avoid Sync Issues:**
-    - Live AQI: Updates instantly
-    - AI Predictions: Delayed by 90 seconds
+    **Why Hourly Updates?**
+    - AQI: Changes gradually over hours
+    - Predictions: Based on latest AQI
+    - Both need to be synchronized
     
-    **Why the Delay?**
-    1. GitHub Actions takes ~30s to start
-    2. ML models take ~20s to load
-    3. Upload to Hugging Face takes ~10s
+    **Delay Strategy:**
+    - AQI fetched at :00:00
+    - Predictions ready at :01:30
+    - Dashboard shows both together
+    - 90-second buffer ensures sync
     
-    **Result:**
-    - No more "previous hour" predictions
-    - Predictions always match current AQI
-    - Clear loading state for users
+    **User Experience:**
+    - Clear loading states
+    - No confusing mismatches
+    - Predictions always match AQI
     """)
 
 with col_info3:
-    st.markdown("### 🚀 Real-time Features")
+    st.markdown("### 🚀 System Features")
     st.markdown("""
-    **Live Monitoring:**
-    - Current AQI: Real-time API
-    - 5-minute auto-refresh
+    **Data Sources:**
+    - AQI: Open-Meteo API (hourly)
+    - Predictions: Custom ML models
+    - Storage: Hugging Face Hub
+    
+    **Automation:**
+    - GitHub Actions hourly triggers
+    - Auto-deploy predictions
+    - Cache management
+    
+    **Dashboard:**
+    - Real-time status monitoring
     - Health recommendations
-    
-    **AI Forecasting:**
-    - 3-day predictions
-    - Generated hourly
-    - Available after 90s delay
-    - Always synchronized
-    
-    **User Experience:**
-    - Shows "Generating..." state
-    - Countdown timer
-    - Clear status messages
-    - Manual refresh option
+    - Forecast visualizations
+    - Auto-refresh logic
     """)
 
 # Footer
@@ -658,31 +672,28 @@ col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
     if show_loading:
         st.markdown(f"""
-        **Dashboard Status:** ⏳ AI PREDICTIONS GENERATING | 
-        **Available in:** {seconds_remaining} seconds | 
-        **Current Time:** {now.strftime('%H:%M:%S UTC')}
+        **System Status:** ⏳ AI PREDICTIONS GENERATING | 
+        **Current AQI:** {current_aqi} ({current_data['display_time']}) | 
+        **Predictions available in:** {seconds_remaining} seconds | 
+        **System Time:** {now.strftime('%H:%M:%S UTC')}
         """)
     else:
-        next_update = datetime(now.year, now.month, now.day, now.hour, 0, 0) + timedelta(hours=1)
-        minutes_remaining = int((next_update - now).total_seconds() / 60)
+        minutes_until_next = 60 - now.minute
         st.markdown(f"""
-        **Dashboard Status:** 🟢 LIVE & AUTO-UPDATING | 
-        **Current Time:** {now.strftime('%H:%M:%S UTC')} | 
-        **Next AI Predictions:** {next_update.strftime('%H:%M')} UTC ({minutes_remaining} min)
+        **System Status:** 🟢 HOURLY UPDATES ACTIVE | 
+        **Current AQI:** {current_aqi} ({current_data['display_time']}) | 
+        **Next full update:** {next_hour_start.strftime('%H:00 UTC')} ({minutes_until_next} min) | 
+        **System Time:** {now.strftime('%H:%M:%S UTC')}
         """)
     
     st.caption("""
-    Live AQI from Open-Meteo API | AI Forecasts from Hugging Face ML Models | 
-    Fully automated via GitHub Actions | Predictions delayed by 90s for synchronization
+    Hourly AQI from Open-Meteo API | AI Forecasts from Hugging Face ML Models | 
+    Fully automated via GitHub Actions | AQI and predictions synchronized hourly
     """)
 
-with col_footer2:
-    if st.button("🔄 Refresh Now", use_container_width=True, type="secondary"):
-        st.cache_data.clear()
-        st.rerun()
+# Remove refresh button entirely - updates are hourly only
 
-# Add auto-refresh logic using st.rerun() at appropriate times
-# Check if we're in the loading window and add a timed refresh
+# Add auto-refresh logic for the loading window
 if show_loading:
     # Set a timer to auto-refresh after the waiting period
     if seconds_remaining <= 10:
@@ -693,15 +704,21 @@ if show_loading:
 
 # Debug section
 with st.expander("🔧 Debug & Raw Data"):
-    tab1, tab2, tab3 = st.tabs(["Live AQI", "Predictions", "System"])
+    tab1, tab2, tab3 = st.tabs(["Hourly AQI", "Predictions", "System"])
     
     with tab1:
-        st.write("### Live AQI Data")
+        st.write("### Hourly AQI Data")
         st.json(current_data)
+        
+        st.write("### Timing Info")
+        st.write(f"Current time: {now}")
+        st.write(f"Current hour start: {current_hour_start}")
+        st.write(f"Next hour start: {next_hour_start}")
+        st.write(f"Cache TTL: 3600 seconds (1 hour)")
         
         # Test API
         if st.button("Test Open-Meteo API"):
-            test_url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=24.8607&longitude=67.0011&current=pm2_5"
+            test_url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=24.8607&longitude=67.0011&current=pm2_5&timezone=auto"
             response = requests.get(test_url, timeout=5)
             st.write("Status:", response.status_code)
             st.json(response.json())
@@ -710,8 +727,7 @@ with st.expander("🔧 Debug & Raw Data"):
         st.write("### AI Forecast Data")
         st.json(predictions)
         
-        st.write("### Timing Info")
-        st.write(f"Current time: {now}")
+        st.write("### Prediction Timing")
         st.write(f"Show loading: {show_loading}")
         if show_loading:
             st.write(f"Seconds remaining: {seconds_remaining}")
@@ -724,5 +740,6 @@ with st.expander("🔧 Debug & Raw Data"):
     with tab3:
         st.write("### System Info")
         st.metric("Current Time UTC", now.strftime('%Y-%m-%d %H:%M:%S'))
-        st.metric("Next Hour", next_hour_start.strftime('%H:%M:%S'))
-        st.metric("Predictions Available", predictions_available_time.strftime('%H:%M:%S'))
+        st.metric("Current Hour Start", current_hour_start.strftime('%H:%M:%S'))
+        st.metric("Next Hour Start", next_hour_start.strftime('%H:%M:%S'))
+        st.metric("Minutes Until Next", minutes_until_next_hour)
