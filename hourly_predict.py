@@ -81,7 +81,24 @@ def fill_previous_targets(df, current_aqi):
     updated = 0
     
     for idx, row in df.iterrows():
+        # FIX: Handle different timestamp formats
         row_ts = row['timestamp']
+        
+        # Convert to integer timestamp
+        if isinstance(row_ts, (pd.Timestamp, datetime)):
+            row_ts = int(row_ts.timestamp())
+        elif isinstance(row_ts, str):
+            try:
+                row_ts = int(float(row_ts))
+            except:
+                continue
+        else:
+            # Assume it's already integer/float
+            try:
+                row_ts = int(row_ts)
+            except:
+                continue
+        
         hours_ago = (current_ts - row_ts) / 3600
         
         # Fill target_day1 for records ~24 hours old
