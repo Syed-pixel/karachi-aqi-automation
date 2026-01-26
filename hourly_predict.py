@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 import joblib
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from huggingface_hub import login, HfApi, hf_hub_download
 from datasets import load_dataset, Dataset
 import os
@@ -74,8 +74,42 @@ def load_model(day_num):
     except:
         return None
 
+def fill_previous_targets(df, current_aqi):
+    """Fill target_day1, target_day2, target_day3 for old records"""
+    now = datetime.now()
+    current_ts = int(now.timestamp())
+    updated = 0
+    
+    for idx, row in df.iterrows():
+        row_ts = row['timestamp']
+        hours_ago = (current_ts - row_ts) / 3600
+        
+        # Fill target_day1 for records ~24 hours old
+        if 23 <= hours_ago <= 25:
+            if pd.isna(row.get('target_day1')):
+                df.at[idx, 'target_day1'] = float(current_aqi)
+                updated += 1
+        
+        # Fill target_day2 for records ~48 hours old
+        elif 47 <= hours_ago <= 49:
+            if pd.isna(row.get('target_day2')):
+                df.at[idx, 'target_day2'] = float(current_aqi)
+                updated += 1
+        
+        # Fill target_day3 for records ~72 hours old
+        elif 71 <= hours_ago <= 73:
+            if pd.isna(row.get('target_day3')):
+                df.at[idx, 'target_day3'] = float(current_aqi)
+                updated += 1
+    
+    if updated > 0:
+        print(f"Filled {updated} target values from past records")
+    
+    return df, updated
+
 def predict():
     features = create_features()
+    current_aqi = features['aqi']
     
     # Prepare input for model
     input_df = pd.DataFrame([{
@@ -97,9 +131,12 @@ def predict():
         else:
             predictions[f'day{day}'] = float(features['aqi'])
     
-    # Save new data
+    # Load dataset and fill previous targets
     dataset = load_dataset(REPO_ID)
     df = dataset['train'].to_pandas()
+    
+    # Fill target values for old records
+    df, updated_count = fill_previous_targets(df, current_aqi)
     
     # Convert timestamp to integer for consistent storage
     dt = pd.to_datetime(features['timestamp'])
@@ -133,7 +170,8 @@ def predict():
     pred_data = {
         'timestamp': str(features['timestamp']),  # Keep as string
         'predictions': {k: float(v) for k, v in predictions.items()},
-        'features': features
+        'features': features,
+        'targets_updated': updated_count
     }
     
     api = HfApi()
@@ -148,6 +186,7 @@ def predict():
     print(f"Current AQI: {features['aqi']}")
     print(f"PM2.5: {features['pm2_5']:.1f}")
     print(f"Predictions: Day1={predictions['day1']:.1f}, Day2={predictions['day2']:.1f}, Day3={predictions['day3']:.1f}")
+    print(f"Updated {updated_count} target values from past records")
     
     return predictions
 
