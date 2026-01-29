@@ -74,53 +74,33 @@ def load_model(day_num):
     except:
         return None
 
-def fill_previous_targets(df, current_aqi):
-    """Fill target_day1, target_day2, target_day3 for old records"""
-    now = datetime.now()
-    current_ts = int(now.timestamp())
+def fill_target_values(df):
+    """Fill target_day1, target_day2, target_day3 using forward-looking logic"""
     updated = 0
+    total_rows = len(df)
     
+    # Only check rows that have null values in target columns
     for idx, row in df.iterrows():
-        # FIX: Handle different timestamp formats
-        row_ts = row['timestamp']
-        
-        # Convert to integer timestamp
-        if isinstance(row_ts, (pd.Timestamp, datetime)):
-            row_ts = int(row_ts.timestamp())
-        elif isinstance(row_ts, str):
-            try:
-                row_ts = int(float(row_ts))
-            except:
-                continue
-        else:
-            # Assume it's already integer/float
-            try:
-                row_ts = int(row_ts)
-            except:
-                continue
-        
-        hours_ago = (current_ts - row_ts) / 3600
-        
-        # Fill target_day1 for records ~24 hours old
-        if 23 <= hours_ago <= 25:
-            if pd.isna(row.get('target_day1')):
-                df.at[idx, 'target_day1'] = float(current_aqi)
+        # Check if target_day1 is null
+        if pd.isna(row.get('target_day1')):
+            future_idx = idx + 24
+            if future_idx < total_rows and not pd.isna(df.at[future_idx, 'aqi']):
+                df.at[idx, 'target_day1'] = float(df.at[future_idx, 'aqi'])
                 updated += 1
         
-        # Fill target_day2 for records ~48 hours old
-        elif 47 <= hours_ago <= 49:
-            if pd.isna(row.get('target_day2')):
-                df.at[idx, 'target_day2'] = float(current_aqi)
+        # Check if target_day2 is null
+        if pd.isna(row.get('target_day2')):
+            future_idx = idx + 48
+            if future_idx < total_rows and not pd.isna(df.at[future_idx, 'aqi']):
+                df.at[idx, 'target_day2'] = float(df.at[future_idx, 'aqi'])
                 updated += 1
         
-        # Fill target_day3 for records ~72 hours old
-        elif 71 <= hours_ago <= 73:
-            if pd.isna(row.get('target_day3')):
-                df.at[idx, 'target_day3'] = float(current_aqi)
+        # Check if target_day3 is null
+        if pd.isna(row.get('target_day3')):
+            future_idx = idx + 72
+            if future_idx < total_rows and not pd.isna(df.at[future_idx, 'aqi']):
+                df.at[idx, 'target_day3'] = float(df.at[future_idx, 'aqi'])
                 updated += 1
-    
-    if updated > 0:
-        print(f"Filled {updated} target values from past records")
     
     return df, updated
 
@@ -148,20 +128,21 @@ def predict():
         else:
             predictions[f'day{day}'] = float(features['aqi'])
     
-    # Load dataset and fill previous targets
+    # Load dataset
     dataset = load_dataset(REPO_ID)
     df = dataset['train'].to_pandas()
     
-    # Fill target values for old records
-    df, updated_count = fill_previous_targets(df, current_aqi)
+    # Fill target values for all rows with null values
+    df, updated_count = fill_target_values(df)
     
     # Convert timestamp to integer for consistent storage
     dt = pd.to_datetime(features['timestamp'])
     timestamp_int = int(dt.timestamp())
     
+    # Create new row
     new_row = {
         'id': int(len(df)),
-        'timestamp': int(timestamp_int),  # Store as int
+        'timestamp': int(timestamp_int),
         'aqi': int(features['aqi']),
         'pm2_5': float(features['pm2_5']),
         'hour': int(features['hour']),
@@ -175,17 +156,16 @@ def predict():
         'target_day3': None
     }
     
-    # FIXED: Use pd.concat instead of append
-    new_df = pd.DataFrame([new_row])
-    df = pd.concat([df, new_df], ignore_index=True)
+    # Add new row
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     
     # Convert to dataset and push
     dataset = Dataset.from_pandas(df)
     dataset.push_to_hub(REPO_ID)
     
-    # Save predictions - convert all numpy types to Python native types
+    # Save predictions
     pred_data = {
-        'timestamp': str(features['timestamp']),  # Keep as string
+        'timestamp': str(features['timestamp']),
         'predictions': {k: float(v) for k, v in predictions.items()},
         'features': features,
         'targets_updated': updated_count
@@ -203,7 +183,7 @@ def predict():
     print(f"Current AQI: {features['aqi']}")
     print(f"PM2.5: {features['pm2_5']:.1f}")
     print(f"Predictions: Day1={predictions['day1']:.1f}, Day2={predictions['day2']:.1f}, Day3={predictions['day3']:.1f}")
-    print(f"Updated {updated_count} target values from past records")
+    print(f"Updated {updated_count} target values from future rows")
     
     return predictions
 
